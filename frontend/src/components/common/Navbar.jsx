@@ -21,10 +21,16 @@ const Navbar = () => {
     // Public links
     links.push({ name: 'Courses', path: '/courses' });
     
+    if (!isAuthenticated) {
+      // Applying needs no account, so keep the entry point in reach.
+      links.push({ name: 'Apply', path: '/apply' });
+    }
+
     if (isAuthenticated) {
       switch (user?.role) {
         case 'student':
           links.push({ name: 'Dashboard', path: '/student-dashboard' });
+          links.push({ name: 'My Application', path: '/application-status' });
           links.push({ name: 'My Classes', path: '/my-classes' });
           break;
         case 'teacher':

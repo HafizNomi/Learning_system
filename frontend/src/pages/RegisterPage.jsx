@@ -24,6 +24,12 @@ const roleOptions = [
   { value: 'teacher', label: 'Teacher', icon: Presentation },
 ];
 
+const roleRedirects = {
+  student: '/student-dashboard',
+  teacher: '/teacher-dashboard',
+  admin: '/admin-panel',
+};
+
 function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -45,10 +51,12 @@ function RegisterPage() {
   const selectedRole = watch('role');
 
   const onSubmit = (data) => {
+    // The API returns a token pair, so a new account is signed in immediately
+    // and lands on its own dashboard rather than back at the login form.
     dispatch(registerUser(data))
       .unwrap()
-      .then(() => {
-        navigate('/login');
+      .then((result) => {
+        navigate(roleRedirects[result.user?.role] || '/', { replace: true });
       })
       .catch(() => {});
   };

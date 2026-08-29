@@ -84,6 +84,14 @@ function CourseCard({ course, index = 0 }) {
           View Details
           <ArrowRight className="w-4 h-4" />
         </Link>
+
+        {/* The apply form reads `?course=` and preselects this course. */}
+        <Link
+          to={`/apply?course=${id}`}
+          className="mt-2 w-full text-center text-sm font-medium text-primary-600 hover:text-primary-700"
+        >
+          Apply for this course
+        </Link>
       </div>
     </motion.div>
   );

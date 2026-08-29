@@ -58,6 +58,17 @@ class Application(models.Model):
     
     # Status tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    # Set when an application is approved: the login the applicant uses from
+    # then on. Applications are submitted anonymously, so this is null until
+    # an admin approves and the account is created/linked.
+    student = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='applications',
+    )
     assigned_teacher = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_applications')
     assigned_time_slot = models.CharField(max_length=50, blank=True)  # e.g., "Monday 5:00 PM"
     
@@ -66,5 +77,8 @@ class Application(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
         return f"{self.student_name} - {self.course.title} ({self.status})"

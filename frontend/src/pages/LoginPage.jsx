@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { motion } from 'framer-motion';
@@ -18,7 +18,11 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoading } = useSelector((state) => state.auth);
+
+  // Where ProtectedRoute bounced them from, if anywhere.
+  const cameFrom = location.state?.from?.pathname;
 
   const {
     register,
@@ -32,7 +36,7 @@ function LoginPage() {
     dispatch(loginUser(data))
       .unwrap()
       .then((result) => {
-        navigate(roleRedirects[result.user?.role] || '/');
+        navigate(cameFrom || roleRedirects[result.user?.role] || '/', { replace: true });
       })
       .catch(() => {});
   };
