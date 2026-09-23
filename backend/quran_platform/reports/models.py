@@ -52,6 +52,7 @@ class MonthlyReport(models.Model):
     
     class Meta:
         unique_together = ['student', 'course', 'month', 'year']
+        ordering = ['-year', '-month']
     
     def __str__(self):
         return f"{self.student.email} - {self.month}/{self.year} Report"
