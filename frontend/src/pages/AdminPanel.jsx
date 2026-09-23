@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { StatusBadge } from '../components/applications/ApplicationStatus';
 import ApplicationReviewModal from '../components/applications/ApplicationReviewModal';
+import ScheduleClassesModal from '../components/scheduling/ScheduleClassesModal';
 import { fetchApplications, setFilters, clearFilters } from '../redux/slices/applicationSlice';
 import { fetchCourses } from '../redux/slices/courseSlice';
 import { APPLICATION_STATUS_LABELS } from '../utils/constants';
@@ -18,6 +19,7 @@ const AdminPanel = () => {
   const { courses } = useSelector((state) => state.courses);
 
   const [reviewing, setReviewing] = useState(null);
+  const [scheduling, setScheduling] = useState(null);
   const [searchInput, setSearchInput] = useState(filters.search);
 
   useEffect(() => {
@@ -44,6 +46,17 @@ const AdminPanel = () => {
     () => (reviewing ? items.find((item) => item.id === reviewing) ?? null : null),
     [reviewing, items]
   );
+
+  // Classes can only be scheduled once a teacher is assigned and the student
+  // has a login - both of which happen on approval.
+  const schedulingApplication = useMemo(
+    () => (scheduling ? items.find((item) => item.id === scheduling) ?? null : null),
+    [scheduling, items]
+  );
+  const canSchedule = (application) =>
+    Boolean(application.assigned_teacher) &&
+    Boolean(application.student) &&
+    ['approved', 'waiting_payment', 'active'].includes(application.status);
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const statusCounts = useMemo(
@@ -168,13 +181,24 @@ const AdminPanel = () => {
                       </td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(application.created_at)}</td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setReviewing(application.id)}
-                          className="font-medium text-primary-600 hover:text-primary-700"
-                        >
-                          Review
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          {canSchedule(application) && (
+                            <button
+                              type="button"
+                              onClick={() => setScheduling(application.id)}
+                              className="font-medium text-green-700 hover:text-green-800"
+                            >
+                              Schedule
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setReviewing(application.id)}
+                            className="font-medium text-primary-600 hover:text-primary-700"
+                          >
+                            Review
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -213,6 +237,13 @@ const AdminPanel = () => {
 
       {openApplication && (
         <ApplicationReviewModal application={openApplication} onClose={() => setReviewing(null)} />
+      )}
+
+      {schedulingApplication && (
+        <ScheduleClassesModal
+          application={schedulingApplication}
+          onClose={() => setScheduling(null)}
+        />
       )}
     </div>
   );
