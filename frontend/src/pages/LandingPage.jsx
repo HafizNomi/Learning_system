@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   BookOpen, Users, Video, Award, 
-  TrendingUp, Shield, Clock, Star 
 } from 'lucide-react';
 
 const LandingPage = () => {

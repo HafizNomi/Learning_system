@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../redux/slices/authSlice';
-import { Menu, X, User, LogOut, BookOpen, Calendar, CreditCard } from 'lucide-react';
+import { Menu, X, LogOut, BookOpen } from 'lucide-react';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,13 +29,11 @@ const Navbar = () => {
     if (isAuthenticated) {
       switch (user?.role) {
         case 'student':
-          links.push({ name: 'Dashboard', path: '/student-dashboard' });
+          links.push({ name: 'My Classes', path: '/student-dashboard' });
           links.push({ name: 'My Application', path: '/application-status' });
-          links.push({ name: 'My Classes', path: '/my-classes' });
           break;
         case 'teacher':
-          links.push({ name: 'Dashboard', path: '/teacher-dashboard' });
-          links.push({ name: 'Schedule', path: '/schedule' });
+          links.push({ name: 'My Classes', path: '/teacher-dashboard' });
           break;
         case 'admin':
           links.push({ name: 'Admin Panel', path: '/admin-panel' });

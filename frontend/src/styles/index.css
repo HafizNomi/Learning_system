@@ -2,6 +2,7 @@
 
 @import "tailwindcss";
 @config "../../tailwind.config.js";
+@import 'react-calendar/dist/Calendar.css';
 
 @layer base {
   body {
@@ -65,5 +66,26 @@
   
   .container-custom {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@layer components {
+  .session-calendar {
+    @apply w-full border-none font-sans;
+  }
+  .session-calendar .react-calendar__tile {
+    @apply rounded-lg py-2 text-sm;
+  }
+  .session-calendar .react-calendar__tile--now {
+    @apply bg-primary-50 font-semibold text-primary-700;
+  }
+  .session-calendar .react-calendar__tile--active {
+    @apply bg-primary-600 text-white;
+  }
+  .session-calendar .react-calendar__tile--active abbr {
+    @apply text-white;
+  }
+  .session-calendar .react-calendar__month-view__weekdays__weekday abbr {
+    @apply no-underline text-xs uppercase tracking-wide text-gray-500;
   }
 }

@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,6 +10,8 @@ from django.conf import settings
 from .models import Payment
 from .serializers import PaymentSerializer, PaymentCreateSerializer
 from applications.models import Application
+
+logger = logging.getLogger(__name__)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -70,11 +74,27 @@ class PaymentCreateView(APIView):
 class PaymentSuccessView(APIView):
     """Handle successful payment from Stripe webhook"""
     
+    # Stripe calls this anonymously, so it must not inherit the project's
+    # default `IsAuthenticatedOrReadOnly` - that would 403 every webhook and
+    # leave paid cards recorded as unpaid. The signature check below is what
+    # actually authenticates the request.
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+    
     def post(self, request):
         # This is the webhook endpoint for Stripe
         # See: https://stripe.com/docs/webhooks
         payload = request.body
         sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+        
+        # Without a configured secret we cannot verify the caller is Stripe.
+        # Refuse rather than trust an unsigned payload that moves money.
+        if not settings.STRIPE_WEBHOOK_SECRET:
+            logger.error('STRIPE_WEBHOOK_SECRET is not set - webhook rejected')
+            return Response(
+                {'error': 'Webhook is not configured'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         
         try:
             event = stripe.Webhook.construct_event(
@@ -83,6 +103,7 @@ class PaymentSuccessView(APIView):
         except ValueError:
             return Response(status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.SignatureVerificationError:
+            logger.warning('Stripe webhook signature verification failed')
             return Response(status=status.HTTP_400_BAD_REQUEST)
         
         # Handle the event
@@ -98,20 +119,31 @@ class PaymentSuccessView(APIView):
             payment = Payment.objects.get(
                 stripe_payment_intent_id=payment_intent['id']
             )
-            payment.status = 'paid'
-            payment.paid_at = timezone.now()
-            payment.save()
-            
-            # Update application status
-            application = payment.application
-            application.status = 'active'
-            application.save()
-            
-            # TODO: Create initial class sessions
-            # self.create_initial_sessions(application)
-            
         except Payment.DoesNotExist:
-            print(f"Payment not found: {payment_intent['id']}")
+            # Stripe took the money but we have no record of it. This needs a
+            # human, so log loudly rather than swallowing it.
+            logger.error('Stripe payment_intent has no Payment row: %s', payment_intent['id'])
+            return
+        
+        # Stripe retries a webhook until it gets a 200, so the same event can
+        # arrive more than once. Doing this twice must not charge or activate
+        # anything a second time.
+        if payment.status == 'paid':
+            logger.info('Ignoring duplicate webhook for payment %s', payment.id)
+            return
+        
+        payment.status = 'paid'
+        payment.paid_at = timezone.now()
+        payment.save(update_fields=['status', 'paid_at', 'updated_at'])
+        
+        # Update application status
+        application = payment.application
+        if application:
+            application.status = 'active'
+            application.save(update_fields=['status', 'updated_at'])
+        
+        # TODO: Create initial class sessions
+        # self.create_initial_sessions(application)
 
 class PaymentHistoryView(generics.ListAPIView):
     """View payment history"""

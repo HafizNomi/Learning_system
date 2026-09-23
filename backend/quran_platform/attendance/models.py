@@ -30,6 +30,10 @@ class Attendance(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
+    class Meta:
+        # Pagination without an explicit order can repeat or skip rows.
+        ordering = ['-created_at']
+
     def __str__(self):
         return f"{self.student.email} - {self.session.start_time} - {'Present' if self.is_present else 'Absent'}"
 
@@ -57,6 +61,7 @@ class MonthlyAttendanceSummary(models.Model):
     
     class Meta:
         unique_together = ['student', 'course', 'month', 'year']
+        ordering = ['-year', '-month']
     
     def __str__(self):
         return f"{self.student.email} - {self.month}/{self.year} - {self.attendance_percentage}%"

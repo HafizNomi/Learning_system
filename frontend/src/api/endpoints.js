@@ -57,20 +57,37 @@ export const applicationAPI = {
   updateStatus: (id, data) => api.patch(`/applications/${id}/update-status/`, data),
 };
 
-// Scheduling endpoints
+// Scheduling endpoints - see backend/quran_platform/scheduling/urls.py
 export const sessionAPI = {
-  getUpcoming: () => api.get('/scheduling/upcoming/'),
-  getSchedule: (date) => api.get(`/scheduling/schedule/?date=${date}`),
+  // Classes that have not finished yet, for whoever is signed in.
+  getUpcoming: (params) => api.get('/scheduling/upcoming/', { params }),
+
+  // Classes that have already finished; `?student_id=` for admins/teachers.
+  getHistory: (params) => api.get('/scheduling/history/', { params }),
+
+  // Everything on one date, bounded in the viewer's own timezone.
+  getSchedule: (date) => api.get('/scheduling/schedule/', { params: { date } }),
+
+  getById: (id) => api.get(`/scheduling/${id}/`),
+
+  // Admin only: one class at a time.
   create: (data) => api.post('/scheduling/create/', data),
+
+  // Admin only: a whole run of classes in one call. Returns what it created
+  // and what it skipped because the teacher was already booked.
+  generate: (data) => api.post('/scheduling/generate/', data),
+
+  // Teacher or admin: reschedule, cancel, or paste the Google Meet link.
   update: (id, data) => api.patch(`/scheduling/${id}/update/`, data),
 };
 
 // Attendance endpoints
 export const attendanceAPI = {
+  // Teacher only: marks the class complete and recalculates the monthly summary.
   mark: (data) => api.post('/attendance/mark/', data),
-  getMonthlySummary: () => api.get('/attendance/monthly-summary/'),
-  getStudentAttendance: (studentId) => 
-    api.get(`/attendance/student-attendance/?student_id=${studentId}`),
+  getMonthlySummary: (params) => api.get('/attendance/monthly-summary/', { params }),
+  getStudentAttendance: (studentId) =>
+    api.get('/attendance/student-attendance/', { params: { student_id: studentId } }),
 };
 
 // Payment endpoints
@@ -82,7 +99,11 @@ export const paymentAPI = {
 
 // Report endpoints
 export const reportAPI = {
+  // Teacher only. Create-or-update: the same student/course/month edits the
+  // existing report rather than making a second one.
   create: (data) => api.post('/reports/create/', data),
-  getAll: () => api.get('/reports/'),
+
+  // `?student_id=&month=&year=`. Parents only ever see finalised reports.
+  getAll: (params) => api.get('/reports/', { params }),
   getById: (id) => api.get(`/reports/${id}/`),
 };

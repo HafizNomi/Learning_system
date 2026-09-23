@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Course
 from .serializers import CourseSerializer
+from accounts.permissions import IsAdmin
 
 class CourseListView(generics.ListAPIView):
     """List all available courses"""
@@ -29,4 +30,5 @@ class CourseCreateView(generics.CreateAPIView):
     
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
-    permission_classes = [permissions.IsAdminUser]
+    # IsAdminUser checks Django's `is_staff`; our admins are `role='admin'`.
+    permission_classes = [IsAdmin]

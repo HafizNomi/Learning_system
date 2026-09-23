@@ -12,8 +12,9 @@ __pycache__/
 # Django
 *.log
 db.sqlite3
-/staticfiles/
-/media/
+# No leading slash: these live in backend/quran_platform/, not backend/.
+staticfiles/
+media/
 
 # Editors
 .vscode/
