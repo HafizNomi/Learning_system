@@ -12,6 +12,7 @@ import { fetchMyApplications } from '../redux/slices/applicationSlice';
 import { fetchMonthlySummary, fetchStudentAttendance } from '../redux/slices/attendanceSlice';
 import { fetchReports } from '../redux/slices/reportSlice';
 import useTimeZone from '../hooks/useTimeZone';
+import useJoinWindow from '../hooks/useJoinWindow';
 import useAuth from '../hooks/useAuth';
 
 const Stat = ({ icon: Icon, label, value, hint }) => (
@@ -47,6 +48,9 @@ const StudentDashboard = () => {
   }, [dispatch]);
 
   const nextClass = upcoming[0] ?? null;
+  // Ticks locally: a student waiting on this page must see the button
+  // enable without reloading.
+  const canJoinNext = useJoinWindow(nextClass);
 
   const attended = useMemo(
     () => records.filter((record) => record.is_present).length,
@@ -97,18 +101,18 @@ const StudentDashboard = () => {
             <div className="mt-5">
               {nextClass.meeting_link ? (
                 <a
-                  href={nextClass.is_joinable ? nextClass.meeting_link : undefined}
+                  href={canJoinNext ? nextClass.meeting_link : undefined}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={(event) => !nextClass.is_joinable && event.preventDefault()}
+                  onClick={(event) => !canJoinNext && event.preventDefault()}
                   className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition ${
-                    nextClass.is_joinable
+                    canJoinNext
                       ? 'bg-white text-primary-700 hover:bg-gray-100'
                       : 'cursor-not-allowed bg-white/20 text-white/70'
                   }`}
                 >
                   <Video className="h-5 w-5" />
-                  {nextClass.is_joinable
+                  {canJoinNext
                     ? 'Join class now'
                     : `Join opens ${tz.countdown(nextClass.join_opens_at)}`}
                 </a>

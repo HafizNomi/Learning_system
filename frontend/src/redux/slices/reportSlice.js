@@ -2,13 +2,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { toast } from 'react-toastify';
 import { reportAPI } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/authStorage';
+import { fetchAllPages } from '../../api/pagination';
 
 const rejectFrom = (error, fallback) => ({
   errors: error.response?.data ?? null,
   message: extractErrorMessage(error.response?.data, error.message || fallback),
 });
-
-const unwrapList = (data) => (Array.isArray(data) ? data : (data?.results ?? []));
 
 // ---------------------------------------------------------------------------
 // Thunks
@@ -21,8 +20,7 @@ export const fetchReports = createAsyncThunk(
       const query = Object.fromEntries(
         Object.entries(params).filter(([, value]) => value !== '' && value != null)
       );
-      const { data } = await reportAPI.getAll(query);
-      return unwrapList(data);
+      return await fetchAllPages(reportAPI.getAll, query);
     } catch (error) {
       return rejectWithValue(rejectFrom(error, 'Could not load reports'));
     }

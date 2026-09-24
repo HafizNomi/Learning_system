@@ -313,6 +313,70 @@ class UpdateSessionTests(SchedulingTestBase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('meeting_link', response.data)
 
+    def test_an_allowed_host_appearing_elsewhere_in_the_url_is_refused(self):
+        """
+        Regression: the check was `host in link`, a substring test over the
+        whole URL. Anything containing 'meet.google.com' passed - including a
+        link whose actual host is an attacker's, which then became the link
+        students were told to click.
+        """
+        self.client.force_authenticate(user=self.teacher)
+
+        for link in (
+            'https://phishing.example.com/?next=meet.google.com',
+            'https://meet.google.com.evil.test/abc-defg-hij',
+            'https://evil.test/meet.google.com/abc',
+            'https://user@evil.test/?x=zoom.us',
+        ):
+            with self.subTest(link=link):
+                response = self.client.patch(
+                    self.url, {'meeting_link': link}, format='json',
+                )
+                self.assertEqual(response.status_code, 400, link)
+                self.session.refresh_from_db()
+                # URLField(null=True), so an unset link is None, not ''.
+                self.assertFalse(self.session.meeting_link)
+
+    def test_real_subdomains_of_allowed_hosts_still_work(self):
+        """Zoom hands out us02web.zoom.us and similar."""
+        self.client.force_authenticate(user=self.teacher)
+        response = self.client.patch(
+            self.url, {'meeting_link': 'https://us02web.zoom.us/j/123456'}, format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_create_session_also_validates_the_link(self):
+        """
+        Regression: CreateSessionView wrote meeting_link straight from the
+        request body, so it was a way straight past the allowlist.
+        """
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(
+            '/api/scheduling/create/',
+            {
+                'application_id': str(self.application.id),
+                'start_time': (self.start + timedelta(days=5))
+                    .isoformat().replace('+00:00', 'Z'),
+                'meeting_link': 'https://phishing.example.com/?next=meet.google.com',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertIn('meeting_link', response.data)
+
+    def test_marking_a_class_ongoing_keeps_it_on_the_students_screen(self):
+        """
+        Regression: 'ongoing' matched neither the upcoming filter
+        (status='scheduled') nor history (end_time in the past), so a class
+        marked in progress vanished from both lists mid-lesson.
+        """
+        self.client.force_authenticate(user=self.teacher)
+        self.client.patch(self.url, {'status': 'ongoing'}, format='json')
+
+        self.client.force_authenticate(user=self.student)
+        response = self.client.get('/api/scheduling/upcoming/')
+        self.assertEqual(response.data['count'], 1)
+
     def test_student_cannot_update_the_session(self):
         self.client.force_authenticate(user=self.student)
         response = self.client.patch(self.url, {'teacher_notes': 'hi'}, format='json')
@@ -363,3 +427,70 @@ class UpdateSessionTests(SchedulingTestBase):
         )
         self.session.refresh_from_db()
         self.assertEqual(self.session.duration_minutes, 45)
+
+
+class StudentDoubleBookingTests(SchedulingTestBase):
+    """A child on two courses must not be booked into two classes at once."""
+
+    def setUp(self):
+        super().setUp()
+        self.other_teacher = User.objects.create_user(
+            email='teacher2@example.com', username='teacher2',
+            password='Passw0rd!x', role='teacher',
+        )
+        self.other_course = Course.objects.create(
+            title='Arabic', description='d', category='quran',
+            price_per_month=Decimal('20.00'),
+        )
+        self.other_application = Application.objects.create(
+            student_name='Bilal', student_age=11, student_gender='male',
+            parent_name='Parent', parent_email='student@example.com',
+            parent_phone='+920000000', course=self.other_course,
+            student=self.student, assigned_teacher=self.other_teacher,
+            status='active',
+        )
+        self.client.force_authenticate(user=self.admin)
+
+    def test_second_course_cannot_overlap_the_first(self):
+        first = self.client.post('/api/scheduling/create/', {
+            'application_id': str(self.application.id),
+            'start_time': self.start.isoformat().replace('+00:00', 'Z'),
+        }, format='json')
+        self.assertEqual(first.status_code, 201)
+
+        # Different teacher, so their diary is clear - but the child's is not.
+        clash = self.client.post('/api/scheduling/create/', {
+            'application_id': str(self.other_application.id),
+            'start_time': (self.start + timedelta(minutes=10))
+                .isoformat().replace('+00:00', 'Z'),
+        }, format='json')
+
+        self.assertEqual(clash.status_code, 400, clash.data)
+        self.assertIn('Student already has a class', clash.data['error'])
+        self.assertEqual(ClassSession.objects.count(), 1)
+
+    def test_the_generator_reports_student_clashes_too(self):
+        self.client.post('/api/scheduling/create/', {
+            'application_id': str(self.application.id),
+            'start_time': self.start.isoformat().replace('+00:00', 'Z'),
+        }, format='json')
+
+        response = self.client.post('/api/scheduling/generate/', {
+            'application_id': str(self.other_application.id),
+            'start_date': self.start.date().isoformat(),
+            'weeks': 1,
+            'time_of_day': self.start.strftime('%H:%M'),
+            'timezone': 'UTC',
+            'weekdays': [self.start.weekday()],
+        }, format='json')
+
+        self.assertEqual(response.data['skipped_count'], 1)
+        self.assertIn('student already has a class', response.data['skipped'][0]['reason'])
+
+
+class MalformedQueryParamTests(SchedulingTestBase):
+    def test_a_bad_student_id_is_a_400_not_a_500(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get('/api/scheduling/history/?student_id=not-a-uuid')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('student_id', response.data)

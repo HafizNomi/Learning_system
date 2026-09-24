@@ -2,13 +2,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { toast } from 'react-toastify';
 import { attendanceAPI } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/authStorage';
+import { fetchAllPages } from '../../api/pagination';
 
 const rejectFrom = (error, fallback) => ({
   errors: error.response?.data ?? null,
   message: extractErrorMessage(error.response?.data, error.message || fallback),
 });
-
-const unwrapList = (data) => (Array.isArray(data) ? data : (data?.results ?? []));
 
 // ---------------------------------------------------------------------------
 // Thunks
@@ -35,8 +34,7 @@ export const fetchMonthlySummary = createAsyncThunk(
   'attendance/fetchSummary',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const { data } = await attendanceAPI.getMonthlySummary(params);
-      return unwrapList(data);
+      return await fetchAllPages(attendanceAPI.getMonthlySummary, params);
     } catch (error) {
       return rejectWithValue(rejectFrom(error, 'Could not load attendance'));
     }
@@ -47,8 +45,9 @@ export const fetchStudentAttendance = createAsyncThunk(
   'attendance/fetchStudent',
   async (studentId, { rejectWithValue }) => {
     try {
-      const { data } = await attendanceAPI.getStudentAttendance(studentId);
-      return unwrapList(data);
+      return await fetchAllPages(
+        (params) => attendanceAPI.getStudentAttendance(studentId, params),
+      );
     } catch (error) {
       return rejectWithValue(rejectFrom(error, 'Could not load attendance records'));
     }

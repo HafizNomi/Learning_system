@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Video, Clock, User, CalendarX2, Link2 } from 'lucide-react';
 import useTimeZone from '../../hooks/useTimeZone';
+import useJoinWindow from '../../hooks/useJoinWindow';
 
 const STATUS_STYLES = {
   scheduled: 'bg-blue-100 text-blue-800',
@@ -28,14 +29,8 @@ const SessionCard = ({
   compact = false,
 }) => {
   const tz = useTimeZone();
-  const [now, setNow] = useState(() => Date.now());
-
-  // The join window opens on a clock, not on a click.
-  useEffect(() => {
-    if (session?.status !== 'scheduled') return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 30_000);
-    return () => clearInterval(timer);
-  }, [session?.status]);
+  // Recomputed on a timer, so a card left open goes live by itself.
+  const withinWindow = useJoinWindow(session);
 
   if (!session) return null;
 
@@ -45,14 +40,6 @@ const SessionCard = ({
     meeting_link, status, status_display, cancellation_reason,
     join_opens_at,
   } = session;
-
-  // Recompute locally so the button flips without another API call. `now` is a
-  // dependency by way of being read here.
-  const withinWindow =
-    meeting_link &&
-    status === 'scheduled' &&
-    now >= new Date(join_opens_at).getTime() &&
-    now <= new Date(end_time).getTime() + 15 * 60_000;
 
   const isCancelled = status === 'cancelled';
   const otherPerson = role === 'teacher' ? student_name : teacher_name;

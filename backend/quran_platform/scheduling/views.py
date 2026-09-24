@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta
 
 import pytz
@@ -5,6 +6,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -25,17 +27,30 @@ def sessions_visible_to(user):
     return ClassSession.objects.filter(Q(student=user) | Q(teacher=user))
 
 
-def teacher_is_free(teacher, start, end, exclude_id=None):
-    """No other scheduled class for this teacher overlaps [start, end)."""
+def _overlaps(field, person, start, end, exclude_id=None):
     clash = ClassSession.objects.filter(
-        teacher=teacher,
         start_time__lt=end,
         end_time__gt=start,
-        status='scheduled',
+        status__in=['scheduled', 'ongoing'],
+        **{field: person},
     )
     if exclude_id:
         clash = clash.exclude(id=exclude_id)
-    return not clash.exists()
+    return clash.exists()
+
+
+def teacher_is_free(teacher, start, end, exclude_id=None):
+    """No other scheduled class for this teacher overlaps [start, end)."""
+    return not _overlaps('teacher', teacher, start, end, exclude_id)
+
+
+def student_is_free(student, start, end, exclude_id=None):
+    """
+    Same check for the student. A child enrolled on two courses can otherwise
+    be generated into two classes at once - the teachers' diaries both look
+    clear, because they are different teachers.
+    """
+    return not _overlaps('student', student, start, end, exclude_id)
 
 
 class SessionQuerysetMixin:
@@ -55,9 +70,11 @@ class UpcomingSessionsView(SessionQuerysetMixin, generics.ListAPIView):
 
     def get_queryset(self):
         # A class stays "upcoming" until it has actually finished, so a student
-        # who opens the page mid-lesson still sees the Join button.
+        # who opens the page mid-lesson still sees the Join button. 'ongoing'
+        # has to be here too, or marking a class in progress makes it vanish
+        # from both this list and the history one.
         return self.base_queryset().filter(
-            end_time__gte=timezone.now(), status='scheduled',
+            end_time__gte=timezone.now(), status__in=['scheduled', 'ongoing'],
         ).order_by('start_time')
 
 
@@ -67,9 +84,13 @@ class SessionHistoryView(SessionQuerysetMixin, generics.ListAPIView):
     def get_queryset(self):
         queryset = self.base_queryset().filter(end_time__lt=timezone.now())
 
+        # A malformed uuid is a bad request, not a server error.
         student_id = self.request.query_params.get('student_id')
         if student_id:
-            queryset = queryset.filter(student_id=student_id)
+            try:
+                queryset = queryset.filter(student_id=uuid.UUID(student_id))
+            except (ValueError, AttributeError, TypeError):
+                raise ValidationError({'student_id': 'Not a valid id.'})
 
         return queryset.order_by('-start_time')
 
@@ -156,6 +177,23 @@ class CreateSessionView(APIView):
                 'error': 'Teacher is already booked at this time'
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        if not student_is_free(application.student, start, end):
+            return Response({
+                'error': 'Student already has a class at this time'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # A link supplied here goes through the same host allowlist as the
+        # PATCH path - otherwise this endpoint is a way straight past it.
+        meeting_link = data.get('meeting_link', '')
+        if meeting_link:
+            link_field = ClassSessionSerializer()
+            try:
+                meeting_link = link_field.validate_meeting_link(meeting_link)
+            except ValidationError as exc:
+                return Response(
+                    {'meeting_link': exc.detail}, status=status.HTTP_400_BAD_REQUEST,
+                )
+
         # Create session
         session = ClassSession.objects.create(
             student=application.student,
@@ -165,8 +203,7 @@ class CreateSessionView(APIView):
             start_time=start,
             end_time=end,
             status='scheduled',
-            # The teacher pastes a Google Meet link; see SessionRescheduleSerializer.
-            meeting_link=data.get('meeting_link', ''),
+            meeting_link=meeting_link,
         )
 
         serializer = ClassSessionSerializer(session, context={'request': request})
@@ -231,6 +268,8 @@ class GenerateSessionsView(APIView):
                     skipped.append({'start_time': start, 'reason': 'in the past'})
                 elif not teacher_is_free(teacher, start, end):
                     skipped.append({'start_time': start, 'reason': 'teacher already booked'})
+                elif not student_is_free(application.student, start, end):
+                    skipped.append({'start_time': start, 'reason': 'student already has a class'})
                 else:
                     created.append(ClassSession(
                         student=application.student,
@@ -289,6 +328,11 @@ class UpdateSessionView(APIView):
             if not teacher_is_free(session.teacher, start, end, exclude_id=session.id):
                 return Response({
                     'error': 'Teacher is already booked at this time'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if not student_is_free(session.student, start, end, exclude_id=session.id):
+                return Response({
+                    'error': 'Student already has a class at this time'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             session.start_time = start

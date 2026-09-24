@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { toast } from 'react-toastify';
 import { sessionAPI } from '../../api/endpoints';
 import { extractErrorMessage } from '../../api/authStorage';
+import { fetchAllPages, unwrapList } from '../../api/pagination';
 
 /** Shared rejection shape: the raw DRF body plus a display-ready message. */
 const rejectFrom = (error, fallback) => ({
@@ -9,9 +10,6 @@ const rejectFrom = (error, fallback) => ({
   message: extractErrorMessage(error.response?.data, error.message || fallback),
   status: error.response?.status ?? null,
 });
-
-/** DRF pagination is on globally, so unwrap `results`. */
-const unwrapList = (data) => (Array.isArray(data) ? data : (data?.results ?? []));
 
 // ---------------------------------------------------------------------------
 // Thunks
@@ -21,8 +19,8 @@ export const fetchUpcomingSessions = createAsyncThunk(
   'sessions/fetchUpcoming',
   async (_, { rejectWithValue }) => {
     try {
-      const { data } = await sessionAPI.getUpcoming();
-      return unwrapList(data);
+      // Every page: a month of classes already exceeds one page of 20.
+      return await fetchAllPages(sessionAPI.getUpcoming);
     } catch (error) {
       return rejectWithValue(rejectFrom(error, 'Could not load your classes'));
     }
@@ -33,8 +31,7 @@ export const fetchSessionHistory = createAsyncThunk(
   'sessions/fetchHistory',
   async (params = {}, { rejectWithValue }) => {
     try {
-      const { data } = await sessionAPI.getHistory(params);
-      return unwrapList(data);
+      return await fetchAllPages(sessionAPI.getHistory, params);
     } catch (error) {
       return rejectWithValue(rejectFrom(error, 'Could not load past classes'));
     }
@@ -47,6 +44,7 @@ export const fetchSchedule = createAsyncThunk(
   async (date, { rejectWithValue }) => {
     try {
       const { data } = await sessionAPI.getSchedule(date);
+      // One day fits in a page comfortably.
       return { date, sessions: unwrapList(data) };
     } catch (error) {
       return rejectWithValue(rejectFrom(error, 'Could not load that day'));

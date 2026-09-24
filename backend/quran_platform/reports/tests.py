@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.test import APIClient
 
+from applications.models import Application
 from courses.models import Course
 from reports.models import MonthlyReport
 
@@ -32,6 +33,14 @@ class ReportTestBase(TestCase):
             email='student@example.com', username='student',
             password='Passw0rd!x', role='student',
         )
+        # A report is only writable by someone who actually teaches the
+        # student, so every case needs the assignment that makes that true.
+        self.application = Application.objects.create(
+            student_name='Maryam', student_age=10, student_gender='female',
+            parent_name='Parent', parent_email='student@example.com',
+            parent_phone='+920000000', course=self.course,
+            student=self.student, assigned_teacher=self.teacher, status='active',
+        )
 
 
 class ReportCreatePermissionTests(ReportTestBase):
@@ -45,6 +54,77 @@ class ReportCreatePermissionTests(ReportTestBase):
             'year': 2026,
             'teacher_comments': 'Steady progress this month.',
         }
+
+    def test_an_unrelated_teacher_cannot_write_about_this_student(self):
+        """
+        Regression: student_id and course_id come from the request body and
+        `teacher` sat only in get_or_create's defaults, so any teacher could
+        author - and, once is_finalized became writable, publish - a report
+        about a child they had never taught.
+        """
+        outsider = User.objects.create_user(
+            email='outsider@example.com', username='outsider',
+            password='Passw0rd!x', role='teacher',
+        )
+        self.client.force_authenticate(user=outsider)
+
+        response = self.client.post(self.url, self._payload(), format='json')
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(MonthlyReport.objects.exists())
+
+    def test_another_teacher_cannot_overwrite_or_publish_an_existing_report(self):
+        self.client.force_authenticate(user=self.teacher)
+        self.client.post(self.url, self._payload(), format='json')
+
+        # Teaches the same student, but did not write this report.
+        colleague = User.objects.create_user(
+            email='colleague@example.com', username='colleague',
+            password='Passw0rd!x', role='teacher',
+        )
+        Application.objects.create(
+            student_name='Maryam', student_age=10, student_gender='female',
+            parent_name='Parent', parent_email='student@example.com',
+            parent_phone='+920000000', course=self.course,
+            student=self.student, assigned_teacher=colleague, status='active',
+        )
+        self.client.force_authenticate(user=colleague)
+
+        response = self.client.post(
+            self.url,
+            {**self._payload(), 'teacher_comments': 'Overwritten', 'is_finalized': True},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 403)
+        report = MonthlyReport.objects.get()
+        self.assertEqual(report.teacher, self.teacher)
+        self.assertFalse(report.is_finalized)
+
+    def test_an_admin_may_still_edit_any_report(self):
+        self.client.force_authenticate(user=self.teacher)
+        self.client.post(self.url, self._payload(), format='json')
+
+        admin = User.objects.create_user(
+            email='admin@example.com', username='admin',
+            password='Passw0rd!x', role='admin',
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.post(
+            self.url, {**self._payload(), 'is_finalized': True}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(MonthlyReport.objects.get().is_finalized)
+
+    def test_a_nonsense_month_is_a_400_not_a_500(self):
+        self.client.force_authenticate(user=self.teacher)
+        for month in ('abc', 13, 0):
+            with self.subTest(month=month):
+                response = self.client.post(
+                    self.url, {**self._payload(), 'month': month}, format='json',
+                )
+                self.assertEqual(response.status_code, 400)
 
     def test_student_gets_a_clean_403_not_a_crash(self):
         self.client.force_authenticate(user=self.student)

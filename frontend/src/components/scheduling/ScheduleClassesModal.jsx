@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { CalendarPlus } from 'lucide-react';
 import { generateSessions, clearGenerated } from '../../redux/slices/sessionSlice';
@@ -23,7 +23,13 @@ const DAY_PRESETS = {
 
 const TIME_DEFAULTS = { morning: '09:00', afternoon: '14:00', evening: '17:00' };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// toISOString() is UTC: for an admin in the Americas it can already be
+// tomorrow there, so the date field would refuse their actual today.
+const todayISO = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+};
 
 /**
  * Schedule a run of classes for one approved application.
@@ -35,6 +41,12 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const ScheduleClassesModal = ({ application, onClose }) => {
   const dispatch = useDispatch();
   const { generating, lastGenerated, fieldErrors } = useSelector((state) => state.sessions);
+
+  // `lastGenerated` is slice-wide, so a previous run's success panel would
+  // otherwise greet the next student instead of the form.
+  useEffect(() => {
+    dispatch(clearGenerated());
+  }, [dispatch, application.id]);
 
   const [form, setForm] = useState({
     start_date: todayISO(),

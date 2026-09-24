@@ -22,14 +22,30 @@ const useTimeZone = () => {
   const userTimeZone = useSelector((state) => state.auth.user?.timezone)
 
   return useMemo(() => {
-    const zone = userTimeZone || browserTimeZone()
+    const candidate = userTimeZone || browserTimeZone()
+    // Prove the zone works once, here, rather than at every call site.
+    let zone = candidate
+    try {
+      new Date().toLocaleString('en-GB', { timeZone: candidate })
+    } catch {
+      zone = 'UTC'
+    }
 
-    /** Is this timestamp on the same calendar day as `reference`, locally? */
+    /**
+     * Is this timestamp on the same calendar day as `reference`, locally?
+     *
+     * `timezone` is stored per user and is not validated on the way in, so a
+     * bad value here would throw RangeError and blank the whole dashboard.
+     */
     const isSameDay = (value, reference = new Date()) => {
-      const a = new Date(value)
-      const b = new Date(reference)
-      return a.toLocaleDateString('en-CA', { timeZone: zone }) ===
-             b.toLocaleDateString('en-CA', { timeZone: zone })
+      try {
+        const a = new Date(value)
+        const b = new Date(reference)
+        return a.toLocaleDateString('en-CA', { timeZone: zone }) ===
+               b.toLocaleDateString('en-CA', { timeZone: zone })
+      } catch {
+        return false
+      }
     }
 
     const format = (value, options) => {

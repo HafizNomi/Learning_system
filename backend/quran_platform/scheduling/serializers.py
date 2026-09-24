@@ -1,3 +1,5 @@
+from urllib.parse import urlparse
+
 from rest_framework import serializers
 from .models import ClassSession
 from django.contrib.auth import get_user_model
@@ -70,10 +72,20 @@ class ClassSessionSerializer(serializers.ModelSerializer):
         """Convert UTC to user's timezone"""
         return obj.get_end_time_local(self._viewer_timezone())
     
+    # Hosts a class may be held on. Subdomains are allowed (Zoom hands out
+    # us02web.zoom.us and similar), but only as a real subdomain.
+    ALLOWED_MEETING_HOSTS = (
+        'meet.google.com', 'zoom.us', 'teams.microsoft.com', 'whereby.com',
+    )
+    
     def validate_meeting_link(self, value):
         """
         Teachers paste a Google Meet link by hand, so catch the usual slips
         before a student is sent somewhere that doesn't work.
+        
+        The host is compared against the parsed hostname, never by substring:
+        `https://evil.example.com/?next=meet.google.com` contains an allowed
+        host but is not one, and would otherwise become the link students click.
         """
         if not value:
             return value
@@ -82,8 +94,16 @@ class ClassSessionSerializer(serializers.ModelSerializer):
         if not link.startswith(('http://', 'https://')):
             link = f'https://{link}'
         
-        allowed = ('meet.google.com', 'zoom.us', 'teams.microsoft.com', 'whereby.com')
-        if not any(host in link for host in allowed):
+        parsed = urlparse(link)
+        if parsed.scheme not in ('http', 'https'):
+            raise serializers.ValidationError('That is not a valid meeting link.')
+        
+        host = (parsed.hostname or '').lower().rstrip('.')
+        allowed = any(
+            host == permitted or host.endswith(f'.{permitted}')
+            for permitted in self.ALLOWED_MEETING_HOSTS
+        )
+        if not allowed:
             raise serializers.ValidationError(
                 'Paste a meeting link from Google Meet, Zoom, Teams or Whereby.'
             )
@@ -104,6 +124,9 @@ class SessionRescheduleSerializer(serializers.Serializer):
     def validate(self, data):
         if not data:
             raise serializers.ValidationError('Nothing to update.')
+        # 'ongoing' is set while a class is running. UpcomingSessionsView has
+        # to include it or the class disappears from the student's screen
+        # mid-lesson - see the status filter there.
         if data.get('status') == 'cancelled' and not data.get('cancellation_reason'):
             raise serializers.ValidationError({
                 'cancellation_reason': 'Say why the class is being cancelled.'

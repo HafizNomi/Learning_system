@@ -86,8 +86,10 @@ export const attendanceAPI = {
   // Teacher only: marks the class complete and recalculates the monthly summary.
   mark: (data) => api.post('/attendance/mark/', data),
   getMonthlySummary: (params) => api.get('/attendance/monthly-summary/', { params }),
-  getStudentAttendance: (studentId) =>
-    api.get('/attendance/student-attendance/', { params: { student_id: studentId } }),
+  getStudentAttendance: (studentId, params) =>
+    api.get('/attendance/student-attendance/', {
+      params: { ...params, ...(studentId ? { student_id: studentId } : {}) },
+    }),
 };
 
 // Payment endpoints

@@ -31,7 +31,7 @@ const TeacherDashboard = () => {
   const dispatch = useDispatch();
   const tz = useTimeZone();
   const { user } = useAuth();
-  const { upcoming, history, loading } = useSelector((state) => state.sessions);
+  const { upcoming, history, schedule, loading } = useSelector((state) => state.sessions);
   const { items: reports } = useSelector((state) => state.reports);
 
   const [tab, setTab] = useState('today');
@@ -90,13 +90,14 @@ const TeacherDashboard = () => {
     }));
   };
 
-  // The modals read from the store, so they reflect the latest save.
-  const activeLinkSession = linkingSession
-    ? upcoming.find((item) => item.id === linkingSession) ?? null
-    : null;
-  const activeMarkSession = markingSession
-    ? history.find((item) => item.id === markingSession) ?? null
-    : null;
+  // The modals read from the store so they reflect the latest save. The id
+  // can come from any tab, so look through every list - searching only
+  // `upcoming` made "Add link" silently do nothing on the Calendar tab.
+  const findSession = (id) =>
+    [...upcoming, ...history, ...schedule].find((item) => item.id === id) ?? null;
+
+  const activeLinkSession = linkingSession ? findSession(linkingSession) : null;
+  const activeMarkSession = markingSession ? findSession(markingSession) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 py-10">
