@@ -95,3 +95,93 @@ def send_password_changed_notice(user):
         ),
         recipient=user.email,
     )
+
+
+# ---------------------------------------------------------------------------
+# Application lifecycle
+# ---------------------------------------------------------------------------
+
+def send_application_received(application):
+    """Confirm to the parent that their application arrived."""
+    return _send(
+        subject='We received your application',
+        message=(
+            f'Assalamu alaikum {application.parent_name},\n\n'
+            f'Thank you for applying for {application.course.title} for '
+            f'{application.student_name}. We have your application and will be '
+            'in touch within 24 hours.\n\n'
+            f'Your reference is {application.id}. Keep it for your records.\n\n'
+            'Jazak Allah khair.'
+        ),
+        recipient=application.parent_email,
+    )
+
+
+def send_application_approved(user, application, set_password=True):
+    """
+    Welcome the approved applicant and give them a way in.
+
+    The account is created with a random password nobody ever sees, so the
+    link below is the only route to a usable login. It is an ordinary
+    password-reset token, which is why it lands on the existing
+    /reset-password page and needs no new screen.
+    """
+    teacher = application.assigned_teacher
+    lines = [
+        f'Assalamu alaikum {application.parent_name},',
+        '',
+        f'Good news - {application.student_name} has been accepted onto '
+        f'{application.course.title}.',
+    ]
+
+    if teacher:
+        teacher_name = teacher.get_full_name() or teacher.username
+        lines += ['', f'Teacher: {teacher_name}']
+    if application.assigned_time_slot:
+        lines += [f'Time slot: {application.assigned_time_slot}']
+
+    if set_password:
+        uid = make_uid(user)
+        token = default_token_generator.make_token(user)
+        link = build_frontend_url('/reset-password', uid=uid, token=token)
+        lines += [
+            '',
+            'To see the timetable and join classes, choose a password for your '
+            'account using the link below:',
+            '',
+            link,
+            '',
+            f'Sign in afterwards with {user.email}.',
+        ]
+    else:
+        lines += [
+            '',
+            f'Sign in with your existing account ({user.email}) to see the '
+            'timetable and join classes.',
+        ]
+
+    lines += ['', 'Jazak Allah khair.']
+
+    return _send(
+        subject=f'{application.student_name} has been accepted',
+        message='\n'.join(lines),
+        recipient=application.parent_email,
+    )
+
+
+def send_application_rejected(application):
+    """Tell the parent, and leave the door open."""
+    return _send(
+        subject='About your application',
+        message=(
+            f'Assalamu alaikum {application.parent_name},\n\n'
+            f'Thank you for your interest in {application.course.title}. On this '
+            'occasion we are not able to offer a place for '
+            f'{application.student_name}.\n\n'
+            'You are very welcome to apply again, or for one of our other '
+            'courses. If you would like to talk it through, just reply to this '
+            'email.\n\n'
+            'Jazak Allah khair.'
+        ),
+        recipient=application.parent_email,
+    )

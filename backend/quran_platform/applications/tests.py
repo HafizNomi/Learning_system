@@ -4,14 +4,23 @@ account is created and linked.
 """
 from decimal import Decimal
 
+from smtplib import SMTPException
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core import mail
+from django.test import Client, TestCase, override_settings
 from rest_framework.test import APIClient
 
 from applications.models import Application
 from courses.models import Course
 
 User = get_user_model()
+
+# Login is rate-limited (10/min) and the throttle counts live in the cache, so
+# a full-suite run exhausts the budget before these tests reach their login.
+# accounts/tests.py solves it the same way.
+NO_THROTTLE_CACHE = {'default': {'BACKEND': 'django.core.cache.backends.dummy.DummyCache'}}
 
 
 class ApplicationTestBase(TestCase):
@@ -205,3 +214,178 @@ class ApproveApplicationTests(ApplicationTestBase):
             format='json',
         )
         self.assertEqual(response.status_code, 403)
+
+
+@override_settings(CACHES=NO_THROTTLE_CACHE)
+class ApprovalEmailTests(ApplicationTestBase):
+    """Approving must leave the parent able to actually sign in."""
+
+    def setUp(self):
+        super().setUp()
+        self.application = Application.objects.create(
+            **{k: v for k, v in self._payload().items() if k != 'course'},
+            course=self.course,
+        )
+        self.url = f'/api/applications/{self.application.id}/update-status/'
+        self.client.force_authenticate(user=self.admin)
+
+    def _approve(self):
+        return self.client.patch(
+            self.url,
+            {'status': 'approved', 'assigned_teacher': str(self.teacher.id),
+             'assigned_time_slot': 'Monday 5:00 PM'},
+            format='json',
+        )
+
+    def test_approval_emails_a_set_password_link_that_works(self):
+        """
+        The account is created with a random password nobody ever sees, so
+        without this link there is no way into it at all.
+        """
+        mail.outbox = []
+        response = self._approve()
+        self.assertEqual(response.status_code, 200, response.data)
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ['sara@example.com'])
+        self.assertIn('accepted', message.subject)
+        # The teacher and slot are what the parent actually wants to know.
+        self.assertIn('Monday 5:00 PM', message.body)
+
+        link = next(
+            line.strip() for line in message.body.splitlines()
+            if '/reset-password' in line
+        )
+        uid = link.split('uid=')[1].split('&')[0]
+        token = link.split('token=')[1]
+
+        # And the link must actually let them set a password.
+        self.client.force_authenticate(user=None)
+        reset = self.client.post(
+            '/api/accounts/password-reset/confirm/',
+            {'uid': uid, 'token': token,
+             'new_password': 'BrandNew123', 'new_password2': 'BrandNew123'},
+            format='json',
+        )
+        self.assertEqual(reset.status_code, 200, reset.data)
+
+        login = self.client.post(
+            '/api/accounts/login/',
+            {'email': 'sara@example.com', 'password': 'BrandNew123'},
+            format='json',
+        )
+        self.assertEqual(login.status_code, 200, login.data)
+        self.assertEqual(login.data['user']['role'], 'student')
+
+    def test_approving_an_existing_account_does_not_reset_their_password(self):
+        existing = User.objects.create_user(
+            email='sara@example.com', username='sara',
+            password='TheirOwnPassword1', role='student',
+        )
+        mail.outbox = []
+
+        self._approve()
+
+        existing.refresh_from_db()
+        self.assertTrue(existing.check_password('TheirOwnPassword1'))
+        self.assertNotIn('/reset-password', mail.outbox[0].body)
+
+    def test_rejection_emails_the_parent(self):
+        mail.outbox = []
+        response = self.client.patch(self.url, {'status': 'rejected'}, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['sara@example.com'])
+
+    def test_submitting_an_application_confirms_by_email(self):
+        mail.outbox = []
+        response = self.client.post(
+            '/api/applications/apply/', self._payload(parent_email='new@example.com'),
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('received', mail.outbox[0].subject)
+
+    def test_a_broken_mail_server_does_not_fail_the_approval(self):
+        with patch('applications.services.send_application_approved',
+                   side_effect=SMTPException('smtp down')):
+            response = self._approve()
+
+        self.assertEqual(response.status_code, 200)
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, 'approved')
+        self.assertIsNotNone(self.application.student)
+
+
+class DjangoAdminApprovalTests(ApplicationTestBase):
+    """
+    The Django admin used to write the row and nothing else, producing an
+    application marked `approved` with no login behind it.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.application = Application.objects.create(
+            **{k: v for k, v in self._payload().items() if k != 'course'},
+            course=self.course,
+        )
+        self.admin.set_password('Passw0rd!x')
+        self.admin.is_staff = True
+        self.admin.is_superuser = True
+        self.admin.save()
+        self.django_client = Client()
+        self.django_client.force_login(self.admin)
+        self.change_url = f'/admin/applications/application/{self.application.id}/change/'
+
+    def _form(self, **overrides):
+        payload = {
+            'student_name': self.application.student_name,
+            'student_age': self.application.student_age,
+            'student_gender': self.application.student_gender,
+            'current_quran_level': '',
+            'parent_name': self.application.parent_name,
+            'parent_email': self.application.parent_email,
+            'parent_phone': self.application.parent_phone,
+            'parent_whatsapp': '',
+            'address': '',
+            'course': str(self.course.id),
+            'preferred_days': 'mon_wed_fri',
+            'preferred_time': 'evening',
+            'preferred_timezone': 'Asia/Karachi',
+            'special_requests': '',
+            'status': 'pending',
+            'assigned_teacher': '',
+            'assigned_time_slot': '',
+            'admin_notes': '',
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_approving_in_the_admin_creates_the_login_and_emails_it(self):
+        mail.outbox = []
+        response = self.django_client.post(
+            self.change_url,
+            self._form(status='approved', assigned_teacher=str(self.teacher.id)),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.application.refresh_from_db()
+        self.assertEqual(self.application.status, 'approved')
+        self.assertIsNotNone(self.application.student, 'no login was created')
+        self.assertEqual(self.application.student.role, 'student')
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_approving_without_a_teacher_warns_instead_of_silently_half_approving(self):
+        mail.outbox = []
+        response = self.django_client.post(
+            self.change_url, self._form(status='approved'), follow=True,
+        )
+
+        self.application.refresh_from_db()
+        self.assertIsNone(self.application.student)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertContains(response, 'Assign a teacher')

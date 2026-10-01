@@ -4,9 +4,15 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+import logging
+
+from accounts.emails import send_application_received
 from accounts.permissions import IsAdmin
+from .services import ApprovalError, handle_status_change
 from .models import Application
 from .serializers import ApplicationSerializer, ApplicationStatusUpdateSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def applications_visible_to(user):
@@ -35,10 +41,14 @@ class ApplicationCreateView(generics.CreateAPIView):
         """Create application and send confirmation email"""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        application = self.perform_create(serializer)
         
-        # TODO: Send email confirmation to parent
-        # Send email: "Your application has been received"
+        # Best-effort: a dead SMTP server must not fail the application.
+        if application is not None:
+            try:
+                send_application_received(application)
+            except Exception:  # noqa: BLE001
+                logger.exception('Confirmation email failed for %s', application.id)
         
         return Response({
             'message': 'Application submitted successfully!',
@@ -51,9 +61,8 @@ class ApplicationCreateView(generics.CreateAPIView):
         """A signed-in applicant is linked to their application straight away"""
         user = self.request.user
         if user.is_authenticated and user.role == 'student':
-            serializer.save(student=user)
-        else:
-            serializer.save()
+            return serializer.save(student=user)
+        return serializer.save()
 
 class ApplicationDetailView(generics.RetrieveAPIView):
     """View application status"""
@@ -106,53 +115,20 @@ class ApplicationStatusUpdateView(APIView):
             new_status = request.data.get('status')
             application = serializer.save()
             
-            if new_status == 'approved':
-                # Assign student to the application
-                # Create user account for student if doesn't exist
-                self._create_student_user(application)
-                
-                # TODO: Send approval email with teacher details
-                # Send email: "Your application has been approved!"
-                
-            elif new_status == 'rejected':
-                # TODO: Send rejection email
-                pass
+            # Creating the login and emailing the parent lives in the service
+            # layer, so the Django admin does exactly the same thing.
+            try:
+                handle_status_change(application, new_status)
+            except ApprovalError as exc:
+                return Response(
+                    {'assigned_teacher': [str(exc)]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             
+            application.refresh_from_db()
             return Response({
                 'message': f'Application {new_status or "updated"} successfully',
                 'application': ApplicationSerializer(application).data,
             })
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def _create_student_user(self, application):
-        """Create Django user for approved student"""
-        from django.contrib.auth import get_user_model
-        User = get_user_model()
-        
-        if application.student_id:
-            return
-        
-        # Check if user already exists
-        user, created = User.objects.get_or_create(
-            email=application.parent_email,
-            defaults={
-                'username': application.parent_email,
-                'first_name': application.student_name,
-                'role': 'student',
-                'timezone': application.preferred_timezone
-            }
-        )
-        
-        if created:
-            # Set random password (user will reset via email)
-            import secrets
-            password = secrets.token_urlsafe(12)
-            user.set_password(password)
-            user.save()
-            
-            # TODO: Send login credentials email
-        
-        # Link student to application
-        application.student = user
-        application.save(update_fields=['student', 'updated_at'])
