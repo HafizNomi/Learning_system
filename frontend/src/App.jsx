@@ -7,6 +7,7 @@ import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import { loadCurrentUser } from './redux/slices/authSlice';
 import { getAccessToken } from './api/authStorage';
+import useTheme from './hooks/useTheme';
 
 // Components
 import Navbar from './components/common/Navbar';
@@ -43,6 +44,26 @@ function SessionLoader({ children }) {
   }, [dispatch]);
 
   return children;
+}
+
+/** Toasts have their own light/dark skins; keep them with the page. */
+function ThemedToasts() {
+  const { resolvedTheme } = useTheme();
+
+  return (
+    <ToastContainer
+      position="top-right"
+      autoClose={5000}
+      hideProgressBar={false}
+      newestOnTop
+      closeOnClick
+      rtl={false}
+      pauseOnFocusLoss
+      draggable
+      pauseOnHover
+      theme={resolvedTheme}
+    />
+  );
 }
 
 function App() {
@@ -97,18 +118,7 @@ function App() {
           <Footer />
         </div>
         </SessionLoader>
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
+        <ThemedToasts />
       </Router>
     </Provider>
   );

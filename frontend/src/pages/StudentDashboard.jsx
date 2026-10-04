@@ -107,7 +107,7 @@ const StudentDashboard = () => {
                   onClick={(event) => !canJoinNext && event.preventDefault()}
                   className={`inline-flex items-center gap-2 rounded-lg px-6 py-3 font-semibold transition ${
                     canJoinNext
-                      ? 'bg-white text-primary-700 hover:bg-gray-100'
+                      ? 'on-brand'
                       : 'cursor-not-allowed bg-white/20 text-white/70'
                   }`}
                 >

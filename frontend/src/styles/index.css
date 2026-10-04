@@ -4,6 +4,126 @@
 @config "../../tailwind.config.js";
 @import 'react-calendar/dist/Calendar.css';
 
+/* ===========================================================================
+   Day / night mode
+   ===========================================================================
+   Tailwind v4 compiles its palette to CSS variables declared in `@layer
+   theme` - `bg-white` is `background-color: var(--color-white)`. Redefining
+   those variables therefore re-skins every screen at once, with no `dark:`
+   variant needed on the thousands of utilities already in the JSX.
+
+   `@layer theme` is the lowest-priority layer, so this unlayered block wins.
+
+   The ramp is inverted rather than merely darkened: gray-50 is the page in
+   both themes, gray-900 is the heading in both, so existing markup keeps its
+   intended contrast instead of turning into light text on a light card.
+   The neutrals carry a slight blue cast to sit with the sky-blue brand.      */
+
+/* Lets us write `dark:` explicitly where a utility swap is clearer than a
+   variable swap - the calendar below uses it. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  /* The raised surface: cards, modals, the navbar. `@apply bg-white` inside a
+     component class compiles to var(--color-white) within that rule, so a
+     class-level override of .bg-white never reaches it - hence a token the
+     component layer can use directly. */
+  --surface: #fff;
+}
+
+[data-theme="dark"] {
+  /* Native scrollbars, form controls and spell-check underlines. */
+  color-scheme: dark;
+
+  --surface: #161c24;
+
+  /* --- Surfaces ------------------------------------------------------- */
+  /* `white` is deliberately NOT redefined here: it is both a surface
+     (bg-white on a card) and a foreground (text-white on a brand button).
+     Flipping the variable would turn every button label dark, so only the
+     background use is overridden, just below this block. */
+  --color-gray-50: #0e1319;    /* page background */
+  --color-gray-100: #1c242e;   /* subtle fills, table headers */
+  --color-gray-200: #27313d;   /* borders */
+  --color-gray-300: #36424f;   /* stronger borders, checkbox outlines */
+
+  /* --- Text ----------------------------------------------------------- */
+  --color-gray-400: #6b7a8d;   /* placeholders */
+  --color-gray-500: #8a97a8;   /* captions */
+  --color-gray-600: #a6b2c1;   /* body copy */
+  --color-gray-700: #c3cdd9;
+  --color-gray-800: #dde4ec;
+  --color-gray-900: #eef3f8;   /* headings */
+
+  /* --- Status tints ---------------------------------------------------
+     Badges pair a -50/-100 fill with -700/-800 text. Left alone they would
+     be a bright pill on a dark page, so the pair is inverted together.     */
+  --color-green-50: #122a1b;
+  --color-green-100: #17351f;
+  --color-green-700: #6ee7a0;
+  --color-green-800: #86efac;
+
+  --color-red-50: #2d1517;
+  --color-red-100: #3a191c;
+  --color-red-600: #f98f85;
+  --color-red-700: #fca5a0;
+  --color-red-800: #fca5a0;
+
+  --color-yellow-100: #3a2e12;
+  --color-yellow-800: #fcd34d;
+
+  --color-amber-50: #2d2210;
+  --color-amber-100: #3a2c13;
+  --color-amber-300: #5a4a22;
+  --color-amber-500: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+
+  --color-orange-100: #3a2415;
+  --color-orange-800: #fdba74;
+
+  --color-blue-100: #16293f;
+  --color-blue-800: #93c5fd;
+
+  --color-purple-100: #27193a;
+  --color-purple-800: #d8b4fe;
+
+}
+
+/* The brand ramp comes from tailwind.config.js, which Tailwind inlines as
+   literals rather than variables - so these two tints, which are used as
+   surfaces rather than as the brand itself, need naming directly. */
+[data-theme="dark"] .bg-white { background-color: var(--surface); }
+/* The translucent whites are overlays on brand gradients and photographs,
+   where white is doing its usual job - they stay as they are. */
+
+[data-theme="dark"] .bg-primary-50 { background-color: #14222e; }
+[data-theme="dark"] .bg-primary-100 { background-color: #17293a; }
+[data-theme="dark"] .text-primary-700,
+[data-theme="dark"] .text-primary-800,
+[data-theme="dark"] .text-primary-900 { color: #7dd3fc; }
+[data-theme="dark"] .hover\:bg-primary-50:hover { background-color: #14222e; }
+
+/* Shadows are near-invisible on a dark ground; depth comes from a hairline. */
+[data-theme="dark"] .shadow-md,
+[data-theme="dark"] .shadow-sm,
+[data-theme="dark"] .shadow-lg,
+[data-theme="dark"] .shadow-xl {
+  box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.04),
+              0 8px 24px -12px rgb(0 0 0 / 0.7);
+}
+
+/* Theme changes should feel like a dimmer, not a page swap - but never make
+   someone wait, and never animate for anyone who asked us not to. */
+@media (prefers-reduced-motion: no-preference) {
+  body, .card, .input-field, header, footer, nav, table, [class*="bg-"] {
+    transition: background-color 180ms ease, border-color 180ms ease,
+                color 180ms ease;
+  }
+}
+
 @layer base {
   body {
     @apply font-sans antialiased bg-gray-50 text-gray-900;
@@ -32,6 +152,9 @@
            font-semibold rounded-lg hover:bg-primary-50 
            transition-all duration-200 active:scale-95;
   }
+  [data-theme="dark"] .btn-outline:hover {
+    background-color: #14222e;
+  }
   
   .input-field {
     @apply w-full px-4 py-3 border border-gray-300 rounded-lg 
@@ -40,8 +163,9 @@
   }
   
   .card {
-    @apply bg-white rounded-xl shadow-md hover:shadow-xl 
+    @apply rounded-xl shadow-md hover:shadow-xl 
            transition-all duration-300 overflow-hidden;
+    background-color: var(--surface);
   }
   
   .badge {
@@ -67,6 +191,18 @@
   .container-custom {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
+
+  /* A light control sitting ON the brand gradient - a hero call to action,
+     a chip over a thumbnail. Here white is deliberate contrast against the
+     brand, not a surface, so it must stay white in night mode while
+     `bg-white` cards go dark. */
+  .on-brand {
+    background-color: #fff;
+    color: #0369a1; /* primary-700 */
+  }
+  .on-brand:hover {
+    background-color: #f0f9ff; /* primary-50 */
+  }
 }
 
 @layer components {
@@ -87,5 +223,21 @@
   }
   .session-calendar .react-calendar__month-view__weekdays__weekday abbr {
     @apply no-underline text-xs uppercase tracking-wide text-gray-500;
+  }
+  /* react-calendar's stylesheet hardcodes light colours of its own. */
+  .session-calendar .react-calendar__tile:enabled:hover,
+  .session-calendar .react-calendar__tile:enabled:focus,
+  .session-calendar .react-calendar__navigation button:enabled:hover,
+  .session-calendar .react-calendar__navigation button:enabled:focus {
+    @apply bg-gray-100;
+  }
+  .session-calendar .react-calendar__navigation button {
+    @apply text-gray-800;
+  }
+  .session-calendar .react-calendar__month-view__days__day--neighboringMonth {
+    @apply text-gray-400;
+  }
+  .session-calendar .react-calendar__month-view__days__day--weekend {
+    @apply text-red-600;
   }
 }

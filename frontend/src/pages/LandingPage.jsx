@@ -75,7 +75,7 @@ const LandingPage = () => {
               Online Quran tutoring combined with AI, Blockchain, and programming courses for children and adults.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link to="/courses" className="bg-white text-primary-700 px-8 py-4 rounded-lg font-semibold hover:shadow-lg transition">
+              <Link to="/courses" className="on-brand px-8 py-4 rounded-lg font-semibold hover:shadow-lg transition">
                 Explore Courses
               </Link>
               <Link to="/apply" className="bg-transparent border-2 border-white text-white px-8 py-4 rounded-lg font-semibold hover:bg-white/10 transition">
@@ -215,7 +215,7 @@ const LandingPage = () => {
           <p className="text-xl text-white/90 mb-8">
             Join thousands of students learning Quran and future technologies.
           </p>
-          <Link to="/register" className="bg-white text-primary-700 px-8 py-4 rounded-lg font-semibold hover:shadow-lg transition inline-block">
+          <Link to="/register" className="on-brand px-8 py-4 rounded-lg font-semibold hover:shadow-lg transition inline-block">
             Get Started Today
           </Link>
         </div>

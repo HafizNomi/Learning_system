@@ -46,7 +46,7 @@ function CourseCard({ course, index = 0 }) {
             <BookOpen className="w-12 h-12 text-white/70" />
           </div>
         )}
-        <span className="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full bg-white/90 text-primary-700">
+        <span className="absolute top-3 left-3 text-xs font-semibold px-2.5 py-1 rounded-full on-brand">
           {labelFor(CATEGORY_OPTIONS, category)}
         </span>
       </div>

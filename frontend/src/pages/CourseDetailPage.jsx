@@ -127,7 +127,7 @@ function CourseDetailPage() {
             transition={{ duration: 0.5 }}
           >
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/90 text-primary-700">
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full on-brand">
                 {labelFor(CATEGORY_OPTIONS, course.category)}
               </span>
               <span
