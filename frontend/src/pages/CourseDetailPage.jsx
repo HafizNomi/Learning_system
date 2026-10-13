@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { CATEGORY_OPTIONS, LEVEL_OPTIONS } from '../components/courses/CourseFilter';
+import LessonList from '../components/courses/LessonList';
 import { fetchCourseById, clearSelectedCourse } from '../redux/slices/courseSlice';
 
 const levelStyles = {
@@ -148,7 +149,9 @@ function CourseDetailPage() {
       <div className="container-custom py-10">
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Syllabus */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
+            <LessonList lessons={course.lessons || []} courseId={course.id} />
+
             <div className="card p-6">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 mb-5">
                 <ListChecks className="w-5 h-5 text-primary-600" />

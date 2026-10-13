@@ -1,8 +1,11 @@
 from django.urls import path
-from .views import CourseListView, CourseDetailView, CourseCreateView
+from .views import (
+    CourseListView, CourseDetailView, CourseCreateView, CourseLessonListView
+)
 
 urlpatterns = [
     path('', CourseListView.as_view(), name='course-list'),
     path('create/', CourseCreateView.as_view(), name='course-create'),
     path('<uuid:id>/', CourseDetailView.as_view(), name='course-detail'),
+    path('<uuid:course_id>/lessons/', CourseLessonListView.as_view(), name='course-lessons'),
 ]
