@@ -1,8 +1,8 @@
 # Quran Tutor Platform — Project Roadmap
 
-**Last updated:** 23 September 2026 (Phases 0, 3 and 4 complete)
-**Branch:** `feat/tech-courses`
-**Build order:** Phase 0 ✅ → Phase 3 ✅ → Phase 4 ✅ → **deploy next** (Phase 1)
+**Last updated:** 13 October 2026 (Phases 0, 3, 4 complete; recorded lessons added)
+**Branch:** `feat/youtube-lessons`
+**Build order:** Phase 0 ✅ → Phase 3 ✅ → Phase 4 ✅ → Recorded lessons ✅ → **deploy next** (Phase 1)
 
 This document explains, in plain language:
 
@@ -47,7 +47,7 @@ Here is the honest status of each step:
 | 1 | Browse courses | ✅ Done | ✅ Done | ✅ **Working** |
 | 2 | Apply for a course | ✅ Done | ✅ Done | ✅ **Working** |
 | 3 | Admin approves + assigns teacher | ✅ Done | ✅ Done | ✅ **Working** |
-| 4 | Student login auto-created | ✅ Done | — | 🟡 **No email sent yet** |
+| 4 | Student login auto-created | ✅ Done | ✅ Done | ✅ **Working** — set-password link emailed |
 | 5 | Pay the monthly fee | 🟢 80% | ❌ Not started | 🟠 **Deferred by choice** |
 | 6 | Schedule the classes | ✅ Done | ✅ Done | ✅ **Working** |
 | 7 | Video class (Google Meet) | ✅ Done | ✅ Done | ✅ **Working** |
@@ -64,12 +64,16 @@ teacher pastes a Google Meet link, the student joins from their dashboard, the
 teacher takes the register afterwards, and at month end writes a report the
 parent can read.
 
-Two things are deliberately left out:
+One thing is deliberately left out:
 
-- **Step 4** creates the student's login but does not email them the password.
-  Until that is done, an admin has to send the password reset link by hand.
 - **Step 5** (card payments) is parked on purpose — collect fees by bank
   transfer or JazzCash and mark them paid in the Django admin.
+
+Step 4 is now finished: approving an application emails the parent a
+set-password link, along with the teacher's name and the class times.
+
+**Alongside the pipeline**, courses can now carry **recorded video lessons
+hosted on YouTube** — see section 4c.
 
 Login, registration, email verification and password reset sit alongside this
 pipeline and are fully finished.
@@ -83,7 +87,7 @@ pipeline and are fully finished.
 | App | What it holds | Status |
 |-----|---------------|--------|
 | `accounts` | Users, teachers, JWT login, email verification, password reset | ✅ **100%** — 46 tests pass |
-| `courses` | The course catalogue | 🟢 **85%** — can list/read/create, but **cannot edit or delete via API** |
+| `courses` | The course catalogue + recorded lessons | 🟢 **90%** — lessons done; still **cannot edit or delete a course via API** |
 | `applications` | The apply form + admin approval | ✅ **100%** — finished in the last session |
 | `scheduling` | Class sessions, timezone handling | ✅ **100%** — recurring generator, Meet links, join window |
 | `attendance` | Present/absent + monthly summary | ✅ **100%** |
@@ -97,6 +101,7 @@ pipeline and are fully finished.
 | Login / Register / Forgot password / Verify email | ✅ **100%** |
 | Token refresh, protected routes, role guards | ✅ **100%** |
 | Course list + filters + course detail page | ✅ **100%** |
+| Recorded video lessons (YouTube player) | ✅ **100%** |
 | Apply form + application status tracking | ✅ **100%** |
 | Admin panel — applications review | ✅ **100%** |
 | Admin panel — class scheduling | ✅ **100%** |
@@ -154,8 +159,8 @@ covered by a regression test so it cannot come back.
   generated files would have been committed.
 - Deleted the dead `AppRoutes.jsx`, cleared the unused-import lint warnings.
 
-**Test suite: 120 passing** (was 46 this morning). `manage.py check --deploy` is
-clean apart from the development `SECRET_KEY`, which you replace at deploy time.
+**Test suite: 155 passing.** `manage.py check --deploy` is clean apart from the
+development `SECRET_KEY`, which you replace at deploy time.
 
 ---
 
@@ -165,6 +170,7 @@ clean apart from the development `SECRET_KEY`, which you replace at deploy time.
   ✅ Phase 0   Fix and harden                DONE
   ✅ Phase 3   Scheduling + Google Meet      DONE
   ✅ Phase 4   Attendance + reports          DONE
+  ✅ Recorded lessons on YouTube            DONE
   ▶  Phase 1   Deploy                        2-4 days   <-- next
      Phase 2   Online payments               4-6 days
      Phase 5   Admin panel, part two         3-5 days
@@ -332,6 +338,144 @@ When you want it:
 
 ---
 
+## 4c. Recorded video lessons on YouTube
+
+Live classes happen on Google Meet (section 4b). **Recorded** lessons — the ones
+a student watches on their own — are hosted on YouTube.
+
+### Why YouTube and not our own server
+
+A one-hour recorded class is roughly 500 MB–1 GB. Twenty lessons is 20 GB, and
+every student who watches one downloads it again from your server. A VPS with
+that much storage and bandwidth costs more per month than several students pay
+in fees.
+
+YouTube stores and streams it for free, worldwide, and adjusts the quality
+automatically for a student on a weak mobile connection. **We store only the
+11-character video id** — a few bytes per lesson.
+
+### The flow, step by step
+
+```
+  [1] You record the class                 (OBS, Zoom recording, phone - anything)
+             |
+  [2] Upload it to YouTube as UNLISTED
+             |
+  [3] Copy the link YouTube gives you
+             |
+  [4] Paste it into Django admin -> Course -> Lessons
+             |
+  [5] The portal pulls out the video id and builds the player
+             |
+  [6] Student opens the course page and presses play
+```
+
+### Example: adding one lesson
+
+You record "Week 1 — Tajweed: the heavy and light letters" and upload it. YouTube
+gives you:
+
+```
+https://youtu.be/aircAruvnKk
+```
+
+In the Django admin you open **Courses → Tajweed Rules → Lessons**, and fill in:
+
+| Field | What you type |
+|-------|---------------|
+| Order | `1` |
+| Title | `Week 1 - Heavy and light letters` |
+| Youtube url | `https://youtu.be/aircAruvnKk` |
+| Duration minutes | `24` |
+| Is published | ✅ ticked |
+| Is preview | ☐ unticked |
+
+Press **Save**. That is the whole job.
+
+Behind the scenes the portal reads the id `aircAruvnKk` out of that link and
+builds three things from it:
+
+```
+player     https://www.youtube-nocookie.com/embed/aircAruvnKk?rel=0&modestbranding=1
+thumbnail  https://i.ytimg.com/vi/aircAruvnKk/hqdefault.jpg
+watch      https://www.youtube.com/watch?v=aircAruvnKk
+```
+
+### Any YouTube link works
+
+You never have to tidy the link up. All of these give the same video id, and a
+`?t=90` timestamp or a `&list=` playlist tacked on the end is ignored:
+
+```
+https://www.youtube.com/watch?v=aircAruvnKk        <- the address bar
+https://youtu.be/aircAruvnKk                       <- the Share button
+https://youtu.be/aircAruvnKk?t=90                  <- Share, "start at"
+https://www.youtube.com/embed/aircAruvnKk          <- an embed code
+https://www.youtube.com/shorts/aircAruvnKk         <- a short
+youtu.be/aircAruvnKk                               <- even without https://
+```
+
+Anything that is **not** a YouTube video — a Vimeo link, a channel page, a typo —
+is refused the moment you press Save, with a message telling you what a good link
+looks like. You find out immediately, not when a student clicks and sees nothing.
+
+### Who can watch what
+
+Setting a video to **Unlisted** on YouTube means it never shows in search or on
+your channel — but anyone holding the link can watch. So the link itself is the
+lock, and the portal decides who is handed it.
+
+Each lesson has an **Is preview** tick:
+
+| Is preview | Who can watch it |
+|------------|------------------|
+| ✅ ticked | **Anyone**, including a visitor who has never applied. This is your shop window. |
+| ☐ unticked | **Staff, teachers, and students enrolled on that course** |
+
+"Enrolled" means the student has an application for that course with a status of
+`approved`, `waiting_payment`, `active` or `completed`. A `pending`, `rejected`
+or `withdrawn` application does **not** unlock anything.
+
+A locked lesson still appears in the list, with its **title, length and thumbnail**
+behind a padlock and an "Apply for this course" button. It advertises the lesson
+without giving it away — the video link is never sent to the browser at all.
+
+**Worked example.** The Blockchain course has four lessons, with week 1 ticked as
+a preview:
+
+| Who is looking | What they see |
+|----------------|---------------|
+| A parent browsing, not signed in | Week 1 plays. Weeks 2–4 show padlocks + "Apply for this course". |
+| A student whose application is still `pending` | Exactly the same — pending is not enrolled. |
+| A student whose application is `active` | All four play. |
+| The teacher, or you | All four play. |
+
+### Two details that were chosen deliberately
+
+**Privacy.** The player uses `youtube-nocookie.com`, Google's privacy domain. It
+sets no tracking cookies until the viewer actually presses play. On a platform
+used by children, that is the right default.
+
+**Speed.** YouTube's player is about a megabyte of JavaScript. Ten lessons
+embedded directly would make the course page crawl on a phone — which is how most
+families will open it. So the page loads a thumbnail image, and only builds the
+real player when someone presses play. Nothing reaches Google until then.
+
+### Where to look
+
+| What you want | File |
+|---------------|------|
+| Reading the id out of a link | `backend/quran_platform/courses/youtube.py` |
+| The lesson itself (fields) | `backend/quran_platform/courses/models.py` → `CourseLesson` |
+| Who may watch | `backend/quran_platform/courses/serializers.py` → `can_watch()` |
+| Pasting links | `backend/quran_platform/courses/admin.py` → `CourseLessonAdmin` |
+| The player | `frontend/src/components/courses/YouTubeEmbed.jsx` |
+| The lesson list | `frontend/src/components/courses/LessonList.jsx` |
+
+Covered by 25 tests: every link shape, every rejection, and every access rule.
+
+---
+
 ## 5. How to edit a course
 
 ### Today — use the Django admin (this already works well)
@@ -446,6 +590,7 @@ and delete the `DAILY_API_KEY` line from `.env`.
 | App state (data shared between screens) | `frontend/src/redux/slices/*.js` |
 | Page routes | `frontend/src/App.jsx` |
 | Shared dropdown options / labels | `frontend/src/utils/constants.js` |
+| Recorded video lessons | `courses/youtube.py`, `courses/models.py`, `components/courses/LessonList.jsx` |
 | Form validation rules | `frontend/src/utils/validation.js` |
 
 
