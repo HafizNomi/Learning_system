@@ -112,11 +112,11 @@ function CourseDetailPage() {
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
       {/* Header */}
-      <section className="bg-gradient-to-r from-primary-600 to-secondary-600 text-white py-12">
+      <section className="border-b border-primary-100 bg-primary-50 py-12">
         <div className="container-custom">
           <Link
             to="/courses"
-            className="inline-flex items-center gap-1.5 text-sm text-white/80 hover:text-white mb-6"
+            className="mb-6 inline-flex items-center gap-1.5 text-sm text-primary-700 hover:text-primary-800"
           >
             <ArrowLeft className="w-4 h-4" />
             All courses
@@ -128,7 +128,7 @@ function CourseDetailPage() {
             transition={{ duration: 0.5 }}
           >
             <div className="flex flex-wrap items-center gap-2 mb-3">
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full on-brand">
+              <span className="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-800">
                 {labelFor(CATEGORY_OPTIONS, course.category)}
               </span>
               <span
@@ -140,8 +140,8 @@ function CourseDetailPage() {
               </span>
             </div>
 
-            <h1 className="text-3xl md:text-4xl font-bold mb-3">{course.title}</h1>
-            <p className="text-white/90 max-w-2xl leading-relaxed">{course.description}</p>
+            <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-4xl">{course.title}</h1>
+            <p className="max-w-2xl leading-relaxed text-gray-600">{course.description}</p>
           </motion.div>
         </div>
       </section>

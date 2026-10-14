@@ -36,25 +36,25 @@
   /* Native scrollbars, form controls and spell-check underlines. */
   color-scheme: dark;
 
-  --surface: #161c24;
+  --surface: #141c18;
 
   /* --- Surfaces ------------------------------------------------------- */
   /* `white` is deliberately NOT redefined here: it is both a surface
      (bg-white on a card) and a foreground (text-white on a brand button).
      Flipping the variable would turn every button label dark, so only the
      background use is overridden, just below this block. */
-  --color-gray-50: #0e1319;    /* page background */
-  --color-gray-100: #1c242e;   /* subtle fills, table headers */
-  --color-gray-200: #27313d;   /* borders */
-  --color-gray-300: #36424f;   /* stronger borders, checkbox outlines */
+  --color-gray-50: #0d1411;    /* page background */
+  --color-gray-100: #182220;   /* subtle fills, table headers */
+  --color-gray-200: #24302c;   /* borders */
+  --color-gray-300: #33413c;   /* stronger borders, checkbox outlines */
 
   /* --- Text ----------------------------------------------------------- */
-  --color-gray-400: #6b7a8d;   /* placeholders */
-  --color-gray-500: #8a97a8;   /* captions */
-  --color-gray-600: #a6b2c1;   /* body copy */
-  --color-gray-700: #c3cdd9;
-  --color-gray-800: #dde4ec;
-  --color-gray-900: #eef3f8;   /* headings */
+  --color-gray-400: #6c7d75;   /* placeholders */
+  --color-gray-500: #8b9a92;   /* captions */
+  --color-gray-600: #a7b5ad;   /* body copy */
+  --color-gray-700: #c4cfc9;
+  --color-gray-800: #dde5e0;
+  --color-gray-900: #eef4f0;   /* headings */
 
   /* --- Status tints ---------------------------------------------------
      Badges pair a -50/-100 fill with -700/-800 text. Left alone they would
@@ -99,12 +99,15 @@
 /* The translucent whites are overlays on brand gradients and photographs,
    where white is doing its usual job - they stay as they are. */
 
-[data-theme="dark"] .bg-primary-50 { background-color: #14222e; }
-[data-theme="dark"] .bg-primary-100 { background-color: #17293a; }
+[data-theme="dark"] .bg-primary-50 { background-color: #12241b; }
+[data-theme="dark"] .bg-primary-100 { background-color: #163020; }
+[data-theme="dark"] .bg-primary-200\/40 { background-color: #1a3a26; }
+[data-theme="dark"] .border-primary-100 { border-color: #1d3a29; }
+[data-theme="dark"] .border-primary-200 { border-color: #24462f; }
 [data-theme="dark"] .text-primary-700,
 [data-theme="dark"] .text-primary-800,
-[data-theme="dark"] .text-primary-900 { color: #7dd3fc; }
-[data-theme="dark"] .hover\:bg-primary-50:hover { background-color: #14222e; }
+[data-theme="dark"] .text-primary-900 { color: #7fd0a4; }
+[data-theme="dark"] .hover\:bg-primary-50:hover { background-color: #12241b; }
 
 /* Shadows are near-invisible on a dark ground; depth comes from a hairline. */
 [data-theme="dark"] .shadow-md,
@@ -153,7 +156,7 @@
            transition-all duration-200 active:scale-95;
   }
   [data-theme="dark"] .btn-outline:hover {
-    background-color: #14222e;
+    background-color: #12241b;
   }
   
   .input-field {
@@ -198,10 +201,10 @@
      `bg-white` cards go dark. */
   .on-brand {
     background-color: #fff;
-    color: #0369a1; /* primary-700 */
+    color: #216248; /* primary-700 */
   }
   .on-brand:hover {
-    background-color: #f0f9ff; /* primary-50 */
+    background-color: #f1f8f4; /* primary-50 */
   }
 }
 

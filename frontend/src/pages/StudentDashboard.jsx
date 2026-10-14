@@ -87,7 +87,7 @@ const StudentDashboard = () => {
 
         {/* --- The next class, given the space it deserves ----------------- */}
         {nextClass && (
-          <div className="rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 p-6 text-white shadow-lg">
+          <div className="rounded-2xl bg-gradient-to-r from-primary-700 to-primary-800 p-6 text-white shadow-lg">
             <p className="text-sm font-medium uppercase tracking-wide text-white/70">
               Next class
             </p>

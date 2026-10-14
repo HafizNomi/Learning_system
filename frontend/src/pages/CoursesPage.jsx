@@ -39,15 +39,15 @@ function CoursesPage() {
   return (
     <div className="bg-gray-50 min-h-[calc(100vh-4rem)]">
       {/* Header */}
-      <section className="bg-gradient-to-r from-primary-600 to-secondary-600 text-white py-14">
+      <section className="border-b border-primary-100 bg-primary-50 py-14">
         <div className="container-custom text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h1 className="text-3xl md:text-4xl font-bold mb-3">Explore Our Courses</h1>
-            <p className="text-white/90 max-w-xl mx-auto">
+            <h1 className="mb-3 text-3xl font-bold text-gray-900 md:text-4xl">Explore our courses</h1>
+            <p className="mx-auto max-w-xl text-gray-600">
               Quran recitation, memorization, and future-tech courses taught by expert instructors.
             </p>
           </motion.div>

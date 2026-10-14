@@ -34,7 +34,7 @@ function CourseCard({ course, index = 0 }) {
       className="card flex flex-col overflow-hidden group"
     >
       {/* Thumbnail */}
-      <div className="relative h-40 bg-gradient-to-br from-primary-500 to-secondary-500 overflow-hidden">
+      <div className="relative h-40 bg-gradient-to-br from-primary-400 to-primary-600 overflow-hidden">
         {thumbnail ? (
           <img
             src={thumbnail}
