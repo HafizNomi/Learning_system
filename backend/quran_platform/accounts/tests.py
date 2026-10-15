@@ -717,3 +717,115 @@ class AdminCreatesTeacherTests(TestCase):
         UserAdmin(User, AdminSite()).save_model(request, user, form=None, change=True)
 
         self.assertEqual(len(mail.outbox), 0)
+
+
+class OutboxTests(TestCase):
+    """
+    Every email is written to the Outbox so staff can send it by hand. Losing
+    one would leave an approved student with no way into their account.
+    """
+
+    def setUp(self):
+        from .models import OutboundEmail
+
+        self.OutboundEmail = OutboundEmail
+        self.user = User.objects.create_user(
+            email='ustadh@example.com', username='ustadh',
+            password=STRONG_PASSWORD, role='teacher', first_name='Bilal',
+        )
+        OutboundEmail.objects.all().delete()
+        mail.outbox.clear()
+
+    def test_sending_records_the_email(self):
+        from .emails import send_account_created
+
+        send_account_created(self.user)
+
+        record = self.OutboundEmail.objects.get()
+        self.assertEqual(record.recipient, 'ustadh@example.com')
+        self.assertIn('account is ready', record.subject)
+        self.assertTrue(record.text_body)
+        self.assertTrue(record.html_body)
+
+    def test_the_link_is_pulled_out_on_its_own(self):
+        from .emails import send_account_created
+
+        send_account_created(self.user)
+        record = self.OutboundEmail.objects.get()
+
+        # This is the field staff copy most often, so it must not be buried
+        # in the body.
+        self.assertIn('/reset-password', record.action_url)
+        self.assertIn('new=1', record.action_url)
+        self.assertEqual(record.action_label, 'Create my password')
+
+    def test_a_delivered_email_is_marked_sent(self):
+        from .emails import send_account_created
+
+        record = send_account_created(self.user)
+        self.assertEqual(record.status, self.OutboundEmail.STATUS_SENT)
+        self.assertIsNotNone(record.sent_at)
+        self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(EMAIL_AUTO_SEND=False)
+    def test_manual_mode_records_without_sending(self):
+        from .emails import send_account_created
+
+        record = send_account_created(self.user)
+
+        self.assertEqual(record.status, self.OutboundEmail.STATUS_PENDING)
+        self.assertIsNone(record.sent_at)
+        # Nothing was delivered - the Outbox row is the whole mechanism.
+        self.assertEqual(len(mail.outbox), 0)
+        # But the content is all there, ready to copy.
+        self.assertIn('/reset-password', record.action_url)
+        self.assertTrue(record.text_body)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend',
+        EMAIL_HOST='127.0.0.1', EMAIL_PORT=1,
+    )
+    def test_a_failed_send_is_recorded_not_lost(self):
+        from .emails import send_account_created
+
+        record = send_account_created(self.user)
+
+        self.assertEqual(record.status, self.OutboundEmail.STATUS_FAILED)
+        self.assertTrue(record.error)
+        # The content survives, so it can still be sent by hand.
+        self.assertIn('/reset-password', record.action_url)
+
+    def test_marking_as_sent_by_hand(self):
+        from .emails import send_account_created
+
+        with self.settings(EMAIL_AUTO_SEND=False):
+            record = send_account_created(self.user)
+
+        record.mark_sent()
+        record.refresh_from_db()
+
+        self.assertEqual(record.status, self.OutboundEmail.STATUS_SENT)
+        self.assertIsNotNone(record.sent_at)
+
+    @override_settings(EMAIL_AUTO_SEND=False)
+    def test_approval_still_produces_a_usable_link_in_manual_mode(self):
+        """The whole point: approving someone must never leave them stranded."""
+        from .emails import send_application_approved
+        from applications.models import Application
+        from courses.models import Course
+
+        course = Course.objects.create(
+            title='Tajweed', description='x', category='tajweed', level='beginner',
+        )
+        application = Application.objects.create(
+            student_name='Fatima', student_age=9, student_gender='female',
+            parent_name='Ahmad', parent_email='ahmad@example.com',
+            parent_phone='+100', course=course, student=self.user,
+        )
+
+        record = send_application_approved(self.user, application, set_password=True)
+
+        self.assertEqual(record.status, self.OutboundEmail.STATUS_PENDING)
+        self.assertEqual(record.recipient, 'ahmad@example.com')
+        self.assertIn('/reset-password', record.action_url)
+        self.assertIn('new=1', record.action_url)

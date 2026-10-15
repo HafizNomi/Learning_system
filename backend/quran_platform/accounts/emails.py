@@ -56,10 +56,28 @@ def _send(subject, recipient, heading, paragraphs,
         'closing': closing or ['Jazak Allah khair.'],
     }
 
-    try:
-        text_body = render_to_string('emails/message.txt', context)
-        html_body = render_to_string('emails/message.html', context)
+    text_body = render_to_string('emails/message.txt', context)
+    html_body = render_to_string('emails/message.html', context)
 
+    # Written down first, and always. Whether or not delivery works, an admin
+    # must be able to find this email in the Outbox and send it by hand -
+    # otherwise an approved student can be left with no way into their account.
+    from .models import OutboundEmail
+
+    record = OutboundEmail.objects.create(
+        recipient=recipient,
+        subject=subject,
+        text_body=text_body,
+        html_body=html_body,
+        action_url=button_url or '',
+        action_label=button_label or '',
+    )
+
+    if not getattr(settings, 'EMAIL_AUTO_SEND', True):
+        # Manual mode: the row in the Outbox is the whole delivery mechanism.
+        return record
+
+    try:
         email = EmailMultiAlternatives(
             subject=subject,
             body=text_body,
@@ -68,10 +86,14 @@ def _send(subject, recipient, heading, paragraphs,
         )
         email.attach_alternative(html_body, 'text/html')
         email.send(fail_silently=False)
-        return True
-    except Exception:  # noqa: BLE001 - never fail the request over email delivery
+        record.mark_sent()
+    except Exception as exc:  # noqa: BLE001 - never fail the request over email
         logger.exception('Failed to send %r to %s', subject, recipient)
-        return False
+        record.status = OutboundEmail.STATUS_FAILED
+        record.error = str(exc)
+        record.save(update_fields=['status', 'error'])
+
+    return record
 
 
 def set_password_link(user, new_account=True):

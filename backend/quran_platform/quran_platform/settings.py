@@ -187,6 +187,11 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@qurantutor.com')
 
+# Set to False to stop Django trying to deliver email at all. Every message is
+# still written to the Outbox in the admin, where staff copy it into their own
+# mail client and send it by hand. Useful before SMTP is set up.
+EMAIL_AUTO_SEND = config('EMAIL_AUTO_SEND', default=True, cast=bool)
+
 # Where the SPA lives - used to build the links inside verification and
 # password-reset emails.
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')

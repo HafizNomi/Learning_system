@@ -76,3 +76,57 @@ class TeacherProfile(models.Model):
 
     def __str__(self):
         return f"Teacher: {self.user.email}"
+
+
+class OutboundEmail(models.Model):
+    """
+    Every email the platform produces, kept so a human can send it by hand.
+
+    Automatic sending needs an SMTP account, which is one more thing to set up
+    and get wrong. Until that is worth doing, each email is written down here
+    and an admin copies it into their own mail client. Nothing is lost either
+    way: when SMTP is configured the row is still written, so this doubles as a
+    record of what went out and when.
+    """
+
+    STATUS_PENDING = 'pending'
+    STATUS_SENT = 'sent'
+    STATUS_FAILED = 'failed'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Needs sending'),
+        (STATUS_SENT, 'Sent'),
+        (STATUS_FAILED, 'Failed to send'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=255)
+    text_body = models.TextField()
+    html_body = models.TextField(blank=True)
+
+    # Pulled out of the email because it is the part that matters: without it
+    # a new account has no way in, and it is what gets copied most often.
+    action_url = models.URLField(blank=True, max_length=500)
+    action_label = models.CharField(max_length=100, blank=True)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'outbound email'
+        verbose_name_plural = 'outbox'
+        indexes = [models.Index(fields=['status', '-created_at'])]
+
+    def __str__(self):
+        return f'{self.subject} -> {self.recipient}'
+
+    def mark_sent(self):
+        from django.utils import timezone
+        self.status = self.STATUS_SENT
+        self.sent_at = timezone.now()
+        self.save(update_fields=['status', 'sent_at'])
