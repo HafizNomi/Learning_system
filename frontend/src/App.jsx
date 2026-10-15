@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -7,6 +7,7 @@ import { Provider } from 'react-redux';
 import { store } from './redux/store';
 import { loadCurrentUser } from './redux/slices/authSlice';
 import { getAccessToken } from './api/authStorage';
+import useTheme from './hooks/useTheme';
 
 // Components
 import Navbar from './components/common/Navbar';
@@ -19,7 +20,6 @@ import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
 import ApplyPage from './pages/ApplyPage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import StudentDashboard from './pages/StudentDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import AdminPanel from './pages/AdminPanel';
@@ -45,6 +45,26 @@ function SessionLoader({ children }) {
   return children;
 }
 
+/** Toasts have their own light/dark skins; keep them with the page. */
+function ThemedToasts() {
+  const { resolvedTheme } = useTheme();
+
+  return (
+    <ToastContainer
+      position="top-right"
+      autoClose={5000}
+      hideProgressBar={false}
+      newestOnTop
+      closeOnClick
+      rtl={false}
+      pauseOnFocusLoss
+      draggable
+      pauseOnHover
+      theme={resolvedTheme}
+    />
+  );
+}
+
 function App() {
   return (
     <Provider store={store}>
@@ -64,7 +84,11 @@ function App() {
               <Route path="/application-status" element={<ApplicationStatusPage />} />
               <Route path="/application-status/:id" element={<ApplicationStatusPage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              {/* Public sign-up is closed - see Navbar. The route is kept as a
+                  redirect so old links and bookmarks still land somewhere useful.
+                  RegisterPage itself is left in the codebase, unrouted, in case
+                  self-sign-up is ever wanted again. */}
+              <Route path="/register" element={<Navigate to="/apply" replace />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -97,18 +121,7 @@ function App() {
           <Footer />
         </div>
         </SessionLoader>
-        <ToastContainer
-          position="top-right"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-          theme="light"
-        />
+        <ThemedToasts />
       </Router>
     </Provider>
   );

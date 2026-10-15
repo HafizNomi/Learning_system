@@ -54,4 +54,4 @@ class Payment(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
-        return f"{self.student.email} - ${self.amount} - {self.month}/{self.year} - {self.status}"
+        return f"{self.student.email} - ${self.amount} - {self.payment_month}/{self.payment_year} - {self.status}"

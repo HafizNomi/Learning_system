@@ -5,6 +5,7 @@ import applicationReducer from './slices/applicationSlice';
 import sessionReducer from './slices/sessionSlice';
 import attendanceReducer from './slices/attendanceSlice';
 import paymentReducer from './slices/paymentSlice';
+import reportReducer from './slices/reportSlice';
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     sessions: sessionReducer,
     attendance: attendanceReducer,
     payments: paymentReducer,
+    reports: reportReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -19,6 +19,9 @@ function ResetPasswordPage() {
   // Both come from the link in the reset email.
   const uid = searchParams.get('uid');
   const token = searchParams.get('token');
+  // Set by the emails that create an account. "Reset" is confusing wording for
+  // someone who has never had a password in the first place.
+  const isNewAccount = searchParams.get('new') === '1';
 
   const {
     register,
@@ -63,7 +66,9 @@ function ResetPasswordPage() {
             <div className="w-14 h-14 bg-primary-600 rounded-xl flex items-center justify-center mb-4">
               <ShieldCheck className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Choose a new password</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {isNewAccount ? 'Create your password' : 'Choose a new password'}
+            </h1>
             <p className="text-gray-500 mt-1 text-sm">
               At least 8 characters, with a letter and a number.
             </p>
@@ -136,7 +141,7 @@ function ResetPasswordPage() {
               ) : (
                 <>
                   <ShieldCheck className="w-5 h-5" />
-                  Reset password
+                  {isNewAccount ? 'Create password' : 'Reset password'}
                 </>
               )}
             </button>

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../redux/slices/authSlice';
-import { Menu, X, User, LogOut, BookOpen, Calendar, CreditCard } from 'lucide-react';
+import { Menu, X, LogOut, BookOpen } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,13 +30,11 @@ const Navbar = () => {
     if (isAuthenticated) {
       switch (user?.role) {
         case 'student':
-          links.push({ name: 'Dashboard', path: '/student-dashboard' });
+          links.push({ name: 'My Classes', path: '/student-dashboard' });
           links.push({ name: 'My Application', path: '/application-status' });
-          links.push({ name: 'My Classes', path: '/my-classes' });
           break;
         case 'teacher':
-          links.push({ name: 'Dashboard', path: '/teacher-dashboard' });
-          links.push({ name: 'Schedule', path: '/schedule' });
+          links.push({ name: 'My Classes', path: '/teacher-dashboard' });
           break;
         case 'admin':
           links.push({ name: 'Admin Panel', path: '/admin-panel' });
@@ -74,6 +73,8 @@ const Navbar = () => {
               </Link>
             ))}
 
+            <ThemeToggle />
+
             {isAuthenticated ? (
               <div className="flex items-center space-x-4 ml-4">
                 <div className="flex items-center space-x-2">
@@ -97,20 +98,27 @@ const Navbar = () => {
                 <Link to="/login" className="btn-outline text-sm py-2 px-4">
                   Login
                 </Link>
-                <Link to="/register" className="btn-primary text-sm py-2 px-4">
-                  Register
+                {/* There is no public sign-up: a student account is created when
+                    an admin approves their application, and teachers are added in
+                    the Django admin. Applying is the only way in. */}
+                <Link to="/apply" className="btn-primary text-sm py-2 px-4">
+                  Apply now
                 </Link>
               </div>
             )}
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
-          >
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
+          <div className="flex items-center gap-1 md:hidden">
+            <ThemeToggle />
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
+              className="p-2 rounded-lg hover:bg-gray-100"
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -136,11 +144,11 @@ const Navbar = () => {
                   Login
                 </Link>
                 <Link
-                  to="/register"
+                  to="/apply"
                   className="block w-full text-center btn-primary"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Register
+                  Apply now
                 </Link>
               </div>
             )}

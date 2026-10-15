@@ -133,8 +133,8 @@ function LoginPage() {
 
           <p className="text-center text-sm text-gray-500 mt-8">
             Don't have an account?{' '}
-            <Link to="/register" className="text-primary-600 font-semibold hover:text-primary-700">
-              Create one
+            <Link to="/apply" className="text-primary-600 font-semibold hover:text-primary-700">
+              Apply for a course
             </Link>
           </p>
         </div>

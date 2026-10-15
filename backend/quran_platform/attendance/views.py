@@ -15,8 +15,9 @@ class MarkAttendanceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
-        # Check if user is a teacher
-        if request.user.role != 'teacher':
+        # Check if user is a teacher (admins stand in when a teacher cannot)
+        is_admin = request.user.role == 'admin' or request.user.is_staff
+        if request.user.role != 'teacher' and not is_admin:
             return Response({
                 'error': 'Only teachers can mark attendance'
             }, status=status.HTTP_403_FORBIDDEN)
@@ -25,7 +26,7 @@ class MarkAttendanceView(APIView):
         session = get_object_or_404(ClassSession, id=session_id)
         
         # Check if teacher is assigned to this session
-        if session.teacher != request.user:
+        if session.teacher != request.user and not is_admin:
             return Response({
                 'error': 'You are not assigned to this session'
             }, status=status.HTTP_403_FORBIDDEN)
@@ -35,7 +36,7 @@ class MarkAttendanceView(APIView):
             session=session,
             defaults={
                 'student': session.student,
-                'teacher': request.user,
+                'teacher': session.teacher,
                 'is_present': request.data.get('is_present', False),
                 'is_late': request.data.get('is_late', False),
                 'duration_attended': request.data.get('duration_attended', 0),

@@ -13,16 +13,41 @@ export const fetchCourses = createAsyncThunk(
   }
 )
 
+/** One course, for the detail page. */
+export const fetchCourseById = createAsyncThunk(
+  'courses/fetchCourseById',
+  async (id, { rejectWithValue }) => {
+    try {
+      const { data } = await courseAPI.getById(id)
+      return data
+    } catch (error) {
+      // 404 means the course was deactivated or the link is wrong; the page
+      // shows a "not found" state rather than a generic failure.
+      return rejectWithValue({
+        notFound: error.response?.status === 404,
+        message: error.response?.data?.detail || 'Could not load this course',
+      })
+    }
+  }
+)
+
 const courseSlice = createSlice({
   name: 'courses',
   initialState: {
     courses: [],
     loading: false,
     error: null,
+    selected: null,
+    selectedLoading: false,
+    selectedError: null,
   },
   reducers: {
     setCourses(state, action) {
       state.courses = action.payload
+    },
+    clearSelectedCourse(state) {
+      state.selected = null
+      state.selectedError = null
     },
   },
   extraReducers: (builder) => {
@@ -39,8 +64,22 @@ const courseSlice = createSlice({
         state.loading = false
         state.error = action.payload
       })
+
+      .addCase(fetchCourseById.pending, (state) => {
+        state.selectedLoading = true
+        state.selectedError = null
+        state.selected = null
+      })
+      .addCase(fetchCourseById.fulfilled, (state, action) => {
+        state.selectedLoading = false
+        state.selected = action.payload
+      })
+      .addCase(fetchCourseById.rejected, (state, action) => {
+        state.selectedLoading = false
+        state.selectedError = action.payload
+      })
   },
 })
 
-export const { setCourses } = courseSlice.actions
+export const { setCourses, clearSelectedCourse } = courseSlice.actions
 export default courseSlice.reducer
