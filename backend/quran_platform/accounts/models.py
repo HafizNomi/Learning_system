@@ -20,7 +20,12 @@ class User(AbstractUser):
     ]
 
     # Roles a visitor is allowed to pick when signing up themselves.
-    SELF_SIGNUP_ROLES = [ROLE_STUDENT, ROLE_TEACHER]
+    #
+    # Teachers are created by an admin, never self-registered: anyone who could
+    # sign up as a teacher would appear in the public teacher directory, which
+    # is not acceptable on a platform teaching children. Students normally
+    # arrive through the application form rather than here.
+    SELF_SIGNUP_ROLES = [ROLE_STUDENT]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)

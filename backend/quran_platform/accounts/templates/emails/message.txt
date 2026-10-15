@@ -1,0 +1,14 @@
+{% autoescape off %}{{ heading }}
+
+{% for paragraph in paragraphs %}{{ paragraph }}
+
+{% endfor %}{% if facts %}{% for label, value in facts %}{{ label }}: {{ value }}
+{% endfor %}
+{% endif %}{% if button_url %}{{ button_label }}:
+{{ button_url }}
+
+{% endif %}{% for paragraph in closing %}{{ paragraph }}
+
+{% endfor %}--
+{{ site_name }}
+{% endautoescape %}

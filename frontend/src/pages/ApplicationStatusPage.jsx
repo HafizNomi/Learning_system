@@ -168,7 +168,6 @@ const ApplicationStatusPage = () => {
                 Sign in with the email you applied under to follow this application live.
                 <div className="mt-3 flex gap-3">
                   <Link to="/login" className="btn-primary text-sm py-2 px-4">Sign in</Link>
-                  <Link to="/register" className="btn-outline text-sm py-2 px-4">Create an account</Link>
                 </div>
               </div>
             )}

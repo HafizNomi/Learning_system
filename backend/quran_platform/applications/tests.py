@@ -258,7 +258,9 @@ class ApprovalEmailTests(ApplicationTestBase):
             if '/reset-password' in line
         )
         uid = link.split('uid=')[1].split('&')[0]
-        token = link.split('token=')[1]
+        # Stop at the next parameter: the link now ends with `&new=1`, which
+        # tells the frontend to say "Create your password" rather than "Reset".
+        token = link.split('token=')[1].split('&')[0]
 
         # And the link must actually let them set a password.
         self.client.force_authenticate(user=None)

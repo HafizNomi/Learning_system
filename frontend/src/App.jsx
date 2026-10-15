@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -20,7 +20,6 @@ import CoursesPage from './pages/CoursesPage';
 import CourseDetailPage from './pages/CourseDetailPage';
 import ApplyPage from './pages/ApplyPage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import StudentDashboard from './pages/StudentDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import AdminPanel from './pages/AdminPanel';
@@ -85,7 +84,11 @@ function App() {
               <Route path="/application-status" element={<ApplicationStatusPage />} />
               <Route path="/application-status/:id" element={<ApplicationStatusPage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              {/* Public sign-up is closed - see Navbar. The route is kept as a
+                  redirect so old links and bookmarks still land somewhere useful.
+                  RegisterPage itself is left in the codebase, unrouted, in case
+                  self-sign-up is ever wanted again. */}
+              <Route path="/register" element={<Navigate to="/apply" replace />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/verify-email" element={<VerifyEmailPage />} />

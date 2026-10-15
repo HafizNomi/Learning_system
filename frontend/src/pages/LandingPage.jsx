@@ -231,10 +231,10 @@ const LandingPage = () => {
             who know them by name.
           </p>
           <Link
-            to="/register"
+            to="/apply"
             className="on-brand mt-8 inline-block rounded-lg px-8 py-4 font-semibold transition hover:shadow-lg"
           >
-            Get started today
+            Apply for a course
           </Link>
         </div>
       </section>

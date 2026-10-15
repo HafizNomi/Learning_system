@@ -98,8 +98,11 @@ const Navbar = () => {
                 <Link to="/login" className="btn-outline text-sm py-2 px-4">
                   Login
                 </Link>
-                <Link to="/register" className="btn-primary text-sm py-2 px-4">
-                  Register
+                {/* There is no public sign-up: a student account is created when
+                    an admin approves their application, and teachers are added in
+                    the Django admin. Applying is the only way in. */}
+                <Link to="/apply" className="btn-primary text-sm py-2 px-4">
+                  Apply now
                 </Link>
               </div>
             )}
@@ -141,11 +144,11 @@ const Navbar = () => {
                   Login
                 </Link>
                 <Link
-                  to="/register"
+                  to="/apply"
                   className="block w-full text-center btn-primary"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Register
+                  Apply now
                 </Link>
               </div>
             )}

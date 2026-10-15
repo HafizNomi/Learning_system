@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
 from django.core import mail
-from django.test import override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -56,12 +56,17 @@ class RegistrationTests(APITestCase):
         self.assertNotEqual(user.password, STRONG_PASSWORD)
         self.assertTrue(user.password.startswith('pbkdf2_'))
 
-    def test_registering_a_teacher_creates_a_teacher_profile(self):
+    def test_a_teacher_cannot_be_created_by_signing_up(self):
+        """
+        This used to be allowed and is deliberately not any more: a
+        self-registered teacher would appear in the public teacher directory.
+        Teachers are added in the Django admin, which is covered by
+        AdminCreatesTeacherTests - including that they get a TeacherProfile.
+        """
         response = self.client.post(self.url, self.payload(role='teacher'), format='json')
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        user = User.objects.get(email='aisha@example.com')
-        self.assertTrue(TeacherProfile.objects.filter(user=user).exists())
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email='aisha@example.com').exists())
 
     def test_cannot_self_assign_the_admin_role(self):
         response = self.client.post(self.url, self.payload(role='admin'), format='json')
@@ -550,3 +555,165 @@ class UserManagerTests(APITestCase):
     def test_email_is_required(self):
         with self.assertRaises(ValueError):
             User.objects.create_user(email='', username='x', password=STRONG_PASSWORD)
+
+
+# ---------------------------------------------------------------------------
+# Public sign-up is closed, and emails are templated
+# ---------------------------------------------------------------------------
+
+@override_settings(CACHES=NO_THROTTLE_CACHE)
+class SelfSignupTests(APITestCase):
+    """
+    Teachers are appointed, not self-declared. Anyone who could register as a
+    teacher would appear in the public teacher directory.
+    """
+
+    url = reverse('accounts:register')
+
+    def payload(self, **overrides):
+        data = {
+            'email': 'someone@example.com',
+            'username': 'someone',
+            'password': STRONG_PASSWORD,
+            'password2': STRONG_PASSWORD,
+        }
+        data.update(overrides)
+        return data
+
+    def test_the_teacher_role_is_refused(self):
+        response = self.client.post(self.url, self.payload(role='teacher'), format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('role', response.data)
+        self.assertFalse(User.objects.filter(email='someone@example.com').exists())
+
+    def test_the_admin_role_is_still_refused(self):
+        response = self.client.post(self.url, self.payload(role='admin'), format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_a_student_can_still_be_created_through_the_api(self):
+        # The application flow relies on this path, so it must keep working.
+        response = self.client.post(self.url, self.payload(role='student'), format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class AccountCreatedEmailTests(TestCase):
+    """The email an admin-created account receives."""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            email='ustadh@example.com', username='ustadh',
+            password=STRONG_PASSWORD, role='teacher', first_name='Bilal',
+        )
+
+    def test_it_sends_both_a_text_and_an_html_part(self):
+        from .emails import send_account_created
+
+        self.assertTrue(send_account_created(self.teacher))
+        self.assertEqual(len(mail.outbox), 1)
+
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ['ustadh@example.com'])
+        # Plain text is the body; HTML rides along as an alternative.
+        self.assertEqual(len(message.alternatives), 1)
+        self.assertEqual(message.alternatives[0][1], 'text/html')
+
+    def test_it_says_create_not_reset(self):
+        from .emails import send_account_created
+
+        send_account_created(self.teacher)
+        message = mail.outbox[0]
+        html = message.alternatives[0][0]
+
+        self.assertIn('Create my password', html)
+        self.assertNotIn('Reset your password', html)
+
+    def test_the_link_marks_the_account_as_new(self):
+        from .emails import send_account_created
+
+        send_account_created(self.teacher)
+        # `new=1` is what makes the page say "Create your password".
+        self.assertIn('new=1', mail.outbox[0].body)
+
+    def test_the_raw_link_appears_in_both_parts(self):
+        # A client that blocks HTML, or a person who will not click a button,
+        # must still be able to reach the link.
+        from .emails import send_account_created
+
+        send_account_created(self.teacher)
+        message = mail.outbox[0]
+        self.assertIn('/reset-password', message.body)
+        self.assertIn('/reset-password', message.alternatives[0][0])
+
+    def test_the_plain_text_link_is_not_html_escaped(self):
+        """
+        Django escapes templates by default. In the text part that turns the
+        "&" between query parameters into "&amp;", and the link is dead for
+        anyone who copies it out.
+        """
+        from .emails import send_account_created
+
+        mail.outbox.clear()
+        send_account_created(self.teacher)
+        body = mail.outbox[0].body
+
+        self.assertNotIn('&amp;', body)
+        self.assertIn('&token=', body)
+        self.assertIn('&new=1', body)
+
+    def test_a_password_reset_is_not_marked_as_new(self):
+        from .emails import send_password_reset
+
+        send_password_reset(self.teacher)
+        self.assertNotIn('new=1', mail.outbox[0].body)
+
+
+class AdminCreatesTeacherTests(TestCase):
+    """Adding a user in the Django admin emails them a way in."""
+
+    def test_saving_a_new_teacher_sends_the_email_and_makes_a_profile(self):
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        from .admin import UserAdmin
+        from .models import TeacherProfile
+
+        request = RequestFactory().post('/admin/accounts/user/add/')
+        request.user = User.objects.create_superuser(
+            email='admin@example.com', username='admin', password=STRONG_PASSWORD,
+        )
+        request.session = {}
+        request._messages = FallbackStorage(request)
+
+        teacher = User(email='new@example.com', username='newteacher', role='teacher')
+        teacher.set_password(STRONG_PASSWORD)
+
+        mail.outbox.clear()
+        UserAdmin(User, AdminSite()).save_model(request, teacher, form=None, change=False)
+
+        self.assertTrue(TeacherProfile.objects.filter(user=teacher).exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('new=1', mail.outbox[0].body)
+
+    def test_editing_an_existing_user_sends_nothing(self):
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from django.contrib.messages.storage.fallback import FallbackStorage
+
+        from .admin import UserAdmin
+
+        user = User.objects.create_user(
+            email='existing@example.com', username='existing', password=STRONG_PASSWORD,
+        )
+        request = RequestFactory().post('/admin/accounts/user/1/change/')
+        request.user = User.objects.create_superuser(
+            email='admin2@example.com', username='admin2', password=STRONG_PASSWORD,
+        )
+        request.session = {}
+        request._messages = FallbackStorage(request)
+
+        mail.outbox.clear()
+        UserAdmin(User, AdminSite()).save_model(request, user, form=None, change=True)
+
+        self.assertEqual(len(mail.outbox), 0)
